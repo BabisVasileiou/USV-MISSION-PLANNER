@@ -1,7 +1,7 @@
 # USV Mission Planner
 ### Web-based Mission Planning System for Unmanned Surface Vehicles in the Greek Aegean Sea
 
-> **MSc Thesis Project** — Π.Μ.Σ. «Μη Επανδρωμένα Αυτόνομα και Τηλεκατευθυνόμενα Συστήματα»  
+> **MSc Project** — Π.Μ.Σ. «Μη Επανδρωμένα Αυτόνομα και Τηλεκατευθυνόμενα Συστήματα»  
 > Πανεπιστήμιο Δυτικής Αττικής (UNIWA) — 2026  
 > **Χαράλαμπος Βασιλείου**
 
