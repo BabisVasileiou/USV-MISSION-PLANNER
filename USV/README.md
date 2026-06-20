@@ -1,156 +1,157 @@
-# USV SWARM PLANNER
-## Maritime Mission Planning System v2.4
+# USV Mission Planner
+### Web-based Mission Planning System for Unmanned Surface Vehicles in the Greek Aegean Sea
+
+> **MSc Thesis Project** — Π.Μ.Σ. «Μη Επανδρωμένα Αυτόνομα και Τηλεκατευθυνόμενα Συστήματα»  
+> Πανεπιστήμιο Δυτικής Αττικής (UNIWA) — 2026  
+> **Χαράλαμπος Βασιλείου**
 
 ---
 
-## ΕΓΚΑΤΑΣΤΑΣΗ & ΕΚΚΙΝΗΣΗ (Ελληνικά)
+## Περιγραφή / Description
 
-### Απαιτήσεις
-- Python 3.9 ή νεότερο (https://python.org)
-- Σύνδεση internet (για τον χάρτη και το Open-Meteo API)
+Ένα **web-based εργαλείο υποστήριξης σχεδιασμού αποστολής (mission planner)** για Μη Επανδρωμένα Σκάφη Επιφανείας (USV) στον ελληνικό Αιγαιακό θαλάσσιο χώρο.
 
-### Βήματα
-1. Αποσυμπίεσε τον φάκελο `usv_swarm_planner` στην Επιφάνεια Εργασίας σου.
-2. Κάνε διπλό κλικ στο `START.py` (ή τρέξε: `python START.py`)
-3. Ο browser ανοίγει αυτόματα στο http://localhost:8765
-4. Για τερματισμό: **Ctrl+C** στο terminal
-
-### Αν το START.py δεν ανοίγει με διπλό κλικ:
-- Windows: Δεξί κλικ → "Open with" → Python
-- ή άνοιξε Terminal/CMD, πήγαινε στον φάκελο και γράψε: `python START.py`
+A **web-based mission planning tool** for Unmanned Surface Vehicles (USV) in the Greek Aegean Sea, featuring A* pathfinding, live marine weather routing, and Operational Risk Management (ORM) assessment.
 
 ---
 
-## INSTALLATION & LAUNCH (English)
+## Χαρακτηριστικά / Features
 
-### Requirements
-- Python 3.9+ (https://python.org)
-- Internet connection (for maps and weather API)
+### ✅ Υλοποιημένα / Implemented
+- **A\* Pathfinding** — Βελτιστοποίηση διαδρομής σε διακριτό γεωγραφικό πλέγμα 0.05° με 8-συνδεσιμότητα και παραδεκτή ευρετική (admissible heuristic)
+- **Αποφυγή Ξηράς** — Χωρικός δείκτης STRtree (Shapely) με 695 πολύγωνα ακτογραμμής Ελλάδας (`greece_coastline.geojson`)
+- **Weather-Aware Routing** — Ενσωμάτωση ζωντανών δεδομένων Open-Meteo Marine API (wave height/direction, wind speed/direction) με frontal factor penalty και hard-block κελιών
+- **ORM Risk Assessment** — Εκτίμηση Επιχειρησιακού Κινδύνου 5 παραγόντων (θάλασσα, άνεμος, ενέργεια, επικοινωνίες, κυκλοφορία) → GREEN / YELLOW / RED
+- **Δύο Διαδρομές ανά Αποστολή** — Γεωμετρικά βέλτιστη & weather-aware με σύγκριση ενέργειας (wave_penalty_pct)
+- **3 Πλατφόρμες USV** — Kongsberg Sounder (8m), MANTAS T-38, Textron CUSV
 
-### Steps
-1. Extract `usv_swarm_planner` folder to your Desktop.
-2. Double-click `START.py` (or run: `python START.py`)
-3. Browser opens automatically at http://localhost:8765
-4. To stop: **Ctrl+C** in the terminal window
-
----
-
-## ΛΕΙΤΟΥΡΓΙΕΣ / FEATURES
-
-### 🗺 Mission Planning
-- Κλικ στον χάρτη για Departure / Destination / Waypoints
-- Αυτόματος υπολογισμός διαδρομής (Baseline + Optimized)
-- Real-time ETA, Distance, Energy consumption
-- Save missions to SQLite database
-
-### ⛵ Maritime Awareness
-- Live weather από Open-Meteo Marine API
-- Wave height / direction / period
-- Wind speed & direction
-- AIS targets με CPA / TCPA alerts
-- Wave height forecast chart (24h)
-
-### 💊 Vehicle Health
-- Live fuel gauge με BINGO FUEL alert (<20%)
-- Telemetry polling (speed, heading, RPM, roll)
-- 9 system status indicators
-- Comms loss simulation → RTB / LOITER
-
-### 🔷 Swarm / MUM-T
-- 5 USV management
-- 6 formation types (Line Ahead, Echelon, Diamond, etc.)
-- UAV (Schiebel S-100) MUM-T integration
-- Shared COP, Sensor Fusion, MAVLink
-
-### ⚡ ORM Risk Assessment
-- 6 risk factors με interactive sliders
-- Real-time risk calculation (GREEN/YELLOW/RED)
-- API-backed risk assessment engine
-- Automatic recommendations
-
-### 📊 Analytics
-- Mission statistics & summaries
-- Energy consumption charts
-- Route efficiency comparison
-- Risk distribution pie chart
-
-### ▶ Mission Replay
-- Playback με ×1/×2/×4/×8 speed
-- Event log timeline
-- Seek bar navigation
+### 🔶 Prototype / Εικονική Διεπαφή
+- Swarm / MUM-T coordination (στατική διεπαφή)
+- Vehicle Health / Telemetry (συνθετικά δεδομένα)
+- AIS targets (hardcoded)
+- Mission Simulation (animation)
+- Αποθήκευση/φόρτωση αποστολών
 
 ---
 
-## API ENDPOINTS
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | /api/health | System status |
-| GET | /api/weather?lat=X&lon=Y | Marine weather |
-| POST | /api/route/compute | Compute route + energy |
-| POST | /api/orm/assess | ORM risk assessment |
-| POST | /api/missions | Save mission |
-| GET | /api/missions | List missions |
-| GET | /api/missions/{id} | Get mission details |
-| GET | /api/telemetry/live | Live telemetry |
-| GET | /api/ais/targets | AIS targets |
-| GET | /api/swarm/status | Swarm status |
-| GET | /api/analytics/summary | Analytics data |
-
----
-
-## PROJECT STRUCTURE
+## Αρχιτεκτονική / Architecture
 
 ```
-usv_swarm_planner/
-├── START.py              ← Entry point — run this
-├── README.md
+USV/
 ├── backend/
-│   ├── main.py           ← FastAPI server + all API logic
+│   ├── main.py              ← FastAPI server (USV Mission Planner API v3)
 │   └── requirements.txt
-├── frontend/
-│   └── index.html        ← Full UI (Leaflet + Canvas charts)
 ├── data/
-│   └── usv_swarm.db      ← SQLite (auto-created)
-└── logs/                 ← (reserved for telemetry logs)
+│   └── greece_coastline.geojson  ← MultiPolygon GRC, 695 πολύγωνα
+├── frontend/
+│   └── index.html           ← Single Page Application (Leaflet.js)
+├── logs/
+├── README.md
+├── START.py                 ← Entry point
+├── START_MAC_LINUX.sh
+└── START_WINDOWS.bat
 ```
 
 ---
 
-## PLATFORM DATABASE
+## Εγκατάσταση & Εκκίνηση / Installation & Launch
 
-| Platform | Length | Cruise Speed | Max Wave | Base Consumption |
-|----------|--------|-------------|----------|-----------------|
-| Kongsberg Sounder | 8m | 6-8 kts | 3.5m | 5000 Wh/NM |
-| MANTAS T-38 | 3.8m | 4-6 kts | 2.0m | 3500 Wh/NM |
-| Textron CUSV | 7.3m | 8-12 kts | 3.0m | 6500 Wh/NM |
+### Απαιτήσεις / Requirements
+- Python 3.9+
+- Σύνδεση internet (για χάρτη και Open-Meteo API)
 
----
+### Βήματα / Steps
 
-## ENERGY MODEL
-
-```
-Base Energy    = Distance × 5000 Wh/NM
-Wave Penalty   = floor(WaveHeight / 0.5) × 15% per step
-Wind Penalty   = max(0, (WindSpeed-10) / 10) × 8%
-Final Energy   = Base × (1 + WavePenalty + WindPenalty)
-Reserve (20%)  = Final × 0.20
+**Windows:**
+```bash
+START_WINDOWS.bat
 ```
 
+**Mac / Linux:**
+```bash
+chmod +x START_MAC_LINUX.sh
+./START_MAC_LINUX.sh
+```
+
+**Ή απευθείας / Or directly:**
+```bash
+pip install -r backend/requirements.txt
+python START.py
+```
+
+Ο browser ανοίγει αυτόματα στο → **http://localhost:8765**
+
 ---
 
-## ΤΕΧΝΟΛΟΓΙΕΣ / TECH STACK
+## API Endpoints
 
-- **Backend**: Python 3.12, FastAPI, Uvicorn
-- **Frontend**: HTML5, Vanilla JS, Leaflet 1.9.4
-- **Charts**: Canvas 2D API
-- **Database**: SQLite3
-- **Weather**: Open-Meteo Marine API (free, no key needed)
-- **Maps**: OpenStreetMap (Leaflet)
-- **Path Planning**: A* (simplified grid, marine)
+| Method | Endpoint | Περιγραφή |
+|--------|----------|-----------|
+| `GET` | `/api/health` | Έλεγχος υγείας υπηρεσίας |
+| `GET` | `/api/weather` | Καιρός nearest-neighbor |
+| `GET` | `/api/weather/grid` | Πλέγμα 10×10 καιρικών δεδομένων |
+| `POST` | `/api/route/compute` | Υπολογισμός διαδρομής (A*) |
+| `POST` | `/api/orm/assess` | Εκτίμηση ORM |
 
 ---
 
-## Επικοινωνία / Contact
+## Πλατφόρμες USV / USV Platforms
 
-Αναπτύχθηκε για ακαδημαϊκή έρευνα MUM-T / USV στο πλαίσιο AMSS — UNIWA
+| Πλατφόρμα | max_wave | Speed | base_cost | wave_penalty |
+|-----------|----------|-------|-----------|--------------|
+| Kongsberg Sounder (8m) | 2.75m | 11.0 kn | 17,500 Wh/NM | 0.125 |
+| MANTAS T-38 | 1.75m | 20.0 kn | 62 Wh/NM | 0.175 |
+| Textron CUSV | 4.50m | 12.0 kn | 53,000 Wh/NM | 0.065 |
+
+---
+
+## Τεχνολογίες / Tech Stack
+
+| Επίπεδο | Τεχνολογία |
+|---------|-----------|
+| Backend | Python 3.x, FastAPI, Uvicorn |
+| Γεωχωρική Ανάλυση | Shapely, STRtree |
+| Frontend | HTML5, Leaflet.js 1.9.4 |
+| Καιρός | Open-Meteo Marine API |
+| Pathfinding | A* (heapq, admissible heuristic) |
+| HTTP Client | httpx, Requests |
+
+---
+
+## Μοντέλο Κόστους / Energy Model
+
+```
+step_energy  = distance × base_cost
+penalty      = 1 + (wave_height / 0.5) × wave_penalty × max(0, cos(Δθ))
+step_energy  = step_energy × penalty   # weather-aware mode
+```
+
+**Frontal factor** `max(0, cos(Δθ))`: μεγιστοποιεί ποινή για μετωπικά κύματα (head seas), μηδενίζει για ακολουθητικά (following seas).
+
+---
+
+## Μοντέλο ORM / ORM Model
+
+```
+total_score = 0.7 × max(factors) + 0.3 × avg(factors)
+
+GREEN  (GO)      → total < 33
+YELLOW (CAUTION) → 33 ≤ total < 66
+RED    (NO-GO)   → total ≥ 66
+```
+
+---
+
+## Γνωστοί Περιορισμοί / Known Limitations
+
+- Σταθερό βήμα πλέγματος 0.05° (μη παραμετροποιήσιμο)
+- Open-Meteo: τρέχουσες τιμές (current), όχι ωριαία πρόγνωση
+- haversine: σφαιρική Γη (R=3440.065 NM), προσέγγιση ±0.3% vs WGS84
+- Δεν υπάρχει δυναμικό/υδροδυναμικό μοντέλο σκάφους
+
+---
+
+## Άδεια / License
+
+Για ακαδημαϊκή χρήση — UNIWA AMSS 2026.  
+Academic use only — UNIWA MSc in Autonomous and Remotely Piloted Systems 2026.
