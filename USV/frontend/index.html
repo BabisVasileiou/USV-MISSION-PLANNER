@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>USV MISSION PLANNER</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#050d1a;--bg2:#0a1628;--bg3:#0d1e35;--panel:#091526;
+  --accent:#12B8FF;--aglow:rgba(18,184,255,.15);
+  --txt:#D7E7FF;--txt2:#7fa3c8;--muted:#3d5a7a;
+  --border:#1a3355;--brite:#1e4a7a;
+  --green:#00ff88;--yellow:#ffd700;--red:#ff3b3b;--orange:#ff7a00;
+}
+body{background:var(--bg);color:var(--txt);font-family:'Rajdhani',sans-serif;font-size:14px;overflow:hidden;height:100vh;}
+
+/* TOP BAR */
+#topbar{position:fixed;top:0;left:0;right:0;height:48px;background:rgba(5,13,26,.97);border-bottom:1px solid var(--brite);display:flex;align-items:center;padding:0 14px;z-index:1000;gap:10px;}
+.logo-t{font-family:'Share Tech Mono',monospace;font-size:14px;color:var(--accent);letter-spacing:3px;}
+.logo-s{font-size:10px;color:var(--txt2);letter-spacing:1px;margin-left:4px;}
+.top-mid{flex:1;display:flex;align-items:center;justify-content:center;gap:18px;}
+.coord{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--txt2);}
+.coord span{color:var(--accent);}
+.top-r{display:flex;gap:8px;align-items:center;}
+.pill{font-family:'Share Tech Mono',monospace;font-size:10px;padding:3px 8px;border-radius:2px;letter-spacing:1px;border:1px solid;white-space:nowrap;}
+.pg{background:rgba(0,255,136,.1);color:var(--green);border-color:rgba(0,255,136,.3);}
+.pb{background:var(--aglow);color:var(--accent);border-color:rgba(18,184,255,.3);}
+.py{background:rgba(255,215,0,.1);color:var(--yellow);border-color:rgba(255,215,0,.3);}
+.pr{background:rgba(255,59,59,.1);color:var(--red);border-color:rgba(255,59,59,.3);}
+.clk{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--accent);}
+
+/* SIDEBAR */
+#sidebar{position:fixed;left:0;top:48px;bottom:0;width:214px;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:900;}
+.ns{padding:10px 12px 3px;font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 14px;cursor:pointer;border-left:2px solid transparent;color:var(--txt2);transition:all .15s;user-select:none;}
+.ni:hover{background:rgba(18,184,255,.06);color:var(--txt);}
+.ni.active{background:rgba(18,184,255,.1);border-left-color:var(--accent);color:var(--accent);}
+.ni svg{width:15px;height:15px;flex-shrink:0;opacity:.8;}
+.ni-l{font-size:13px;font-weight:600;letter-spacing:.5px;}
+.ni-b{margin-left:auto;background:var(--accent);color:#000;font-size:9px;font-weight:700;padding:2px 5px;border-radius:2px;font-family:'Share Tech Mono',monospace;}
+.nb-g{background:var(--green)!important;color:#000!important;}
+.nb-y{background:var(--yellow)!important;color:#000!important;}
+.nb-r{background:var(--red)!important;color:#fff!important;}
+
+/* MAIN */
+#main{position:fixed;left:214px;top:48px;right:0;bottom:0;display:flex;flex-direction:column;}
+.tab{display:none;height:100%;overflow:hidden;}
+.tab.active{display:flex;flex-direction:column;}
+#tab-mission{flex-direction:row;}
+
+/* MAP */
+#mapc{flex:1;position:relative;overflow:hidden;}
+#map{width:100%;height:100%;}
+.leaflet-tile{filter:brightness(.35) saturate(.25) hue-rotate(185deg);}
+.leaflet-container{background:#000!important;}
+.leaflet-top.leaflet-right .leaflet-control-zoom{margin-top:10px;margin-right:10px;}
+.leaflet-control-zoom{border:1px solid var(--brite)!important;background:rgba(9,21,38,.92)!important;border-radius:2px!important;}
+.leaflet-control-zoom a{color:var(--txt)!important;background:transparent!important;line-height:26px!important;font-size:16px!important;}
+.leaflet-control-zoom a:hover{background:var(--aglow)!important;color:var(--accent)!important;}
+
+.scan{position:absolute;top:-4px;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent) 50%,transparent);animation:scan 6s linear infinite;opacity:.12;pointer-events:none;z-index:600;}
+@keyframes scan{from{top:-4px}to{top:102%}}
+.cic{position:absolute;width:16px;height:16px;border-color:var(--accent);opacity:.3;pointer-events:none;z-index:601;}
+.cic.tl{top:8px;left:8px;border-top:2px solid;border-left:2px solid;}
+.cic.tr{top:8px;right:8px;border-top:2px solid;border-right:2px solid;}
+.cic.bl{bottom:8px;left:8px;border-bottom:2px solid;border-left:2px solid;}
+.cic.br{bottom:8px;right:8px;border-bottom:2px solid;border-right:2px solid;}
+
+/* MAP TOOLBAR */
+.mtb{position:absolute;top:10px;left:10px;z-index:500;display:flex;flex-direction:column;gap:5px;}
+.mbtn{background:rgba(9,21,38,.93);border:1px solid var(--brite);color:var(--txt);padding:6px 10px;border-radius:2px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;transition:all .15s;white-space:nowrap;}
+.mbtn:hover,.mbtn.sel{background:var(--aglow);border-color:var(--accent);color:var(--accent);}
+
+/* MAP HUD */
+.mhud{position:absolute;bottom:10px;left:10px;z-index:500;background:rgba(9,21,38,.9);border:1px solid var(--border);border-radius:2px;padding:8px 11px;}
+.hr{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--txt2);margin:2px 0;}
+.hr span{color:var(--accent);}
+
+/* WEATHER OVERLAY LEGEND */
+.wx-map-legend{position:absolute;bottom:10px;right:10px;z-index:500;background:rgba(9,21,38,.9);border:1px solid var(--border);border-radius:2px;padding:8px 11px;display:none;}
+.wx-map-legend.on{display:block;}
+.wll{font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:5px;}
+.wli{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt2);margin:3px 0;}
+.wlc{width:12px;height:12px;border-radius:50%;opacity:.8;}
+
+/* ALERT BAR */
+.abar{background:rgba(255,59,59,.12);border-top:1px solid var(--red);border-bottom:1px solid var(--border);padding:6px 14px;text-align:center;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--red);display:none;}
+.abar.on{display:block;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.blink{animation:blink .8s ease-in-out infinite;}
+
+/* RIGHT PANEL */
+#rp{width:292px;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.ph{padding:10px 12px;border-bottom:1px solid var(--border);font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;display:flex;align-items:center;gap:7px;}
+.ps{padding:10px 12px;border-bottom:1px solid var(--border);}
+.pl{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:5px;}
+.psc{flex:1;overflow-y:auto;}
+.psc::-webkit-scrollbar{width:3px;}
+.psc::-webkit-scrollbar-thumb{background:var(--brite);}
+select,input[type=text],input[type=number]{width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--txt);padding:6px 9px;border-radius:2px;font-family:'Rajdhani',sans-serif;font-size:13px;outline:none;transition:border .15s;}
+select:focus,input:focus{border-color:var(--accent);}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px;}
+.btn{padding:7px 12px;border-radius:2px;cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;transition:all .15s;border:1px solid transparent;}
+.bac{background:var(--accent);color:#000;}
+.bac:hover{background:#0fa8e6;}
+.bol{background:transparent;color:var(--accent);border-color:var(--accent);}
+.bol:hover{background:var(--aglow);}
+.brd{background:transparent;color:var(--red);border-color:var(--red);}
+.brd:hover{background:rgba(255,59,59,.1);}
+.byw{background:transparent;color:var(--yellow);border-color:var(--yellow);}
+.byw:hover{background:rgba(255,215,0,.1);}
+.bw{width:100%;margin-bottom:5px;}
+
+/* METRICS */
+.mg{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:10px 12px;}
+.mc{background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:9px;}
+.mcl{font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px;}
+.mcv{font-size:18px;color:var(--txt);font-family:'Share Tech Mono',monospace;}
+.mcu{font-size:10px;color:var(--txt2);margin-left:2px;}
+
+/* ROUTE LEGEND */
+.rleg{display:flex;gap:14px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;align-items:center;}
+.rleg-item{display:flex;align-items:center;gap:6px;color:var(--txt2);}
+.rleg-line{width:28px;height:2px;}
+.rleg-solid{background:#fff;}
+.rleg-dash{background:repeating-linear-gradient(90deg,#7fa3c8 0,#7fa3c8 5px,transparent 5px,transparent 9px);}
+
+/* WAYPOINTS */
+.wpi{display:flex;align-items:center;gap:7px;padding:6px 0;border-bottom:1px solid var(--border);}
+.wpn{width:20px;height:20px;background:var(--accent);color:#000;font-family:'Share Tech Mono',monospace;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:2px;flex-shrink:0;}
+.wpn.dep{background:var(--green);}
+.wpn.dst{background:var(--red);color:#fff;}
+.wpc{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--txt2);flex:1;}
+
+/* VEHICLE HEALTH */
+.hgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:12px;}
+.gc{background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:10px;text-align:center;}
+.gcl{font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;}
+.gcv{font-size:22px;font-family:'Share Tech Mono',monospace;color:var(--accent);}
+.gcb{height:4px;background:var(--bg);border-radius:2px;overflow:hidden;margin-top:6px;}
+.gcf{height:100%;border-radius:2px;transition:width .5s;}
+.fuel-outer{height:22px;background:var(--bg);border:1px solid var(--brite);border-radius:2px;overflow:hidden;}
+.fuel-inner{height:100%;display:flex;align-items:center;padding-left:7px;font-family:'Share Tech Mono',monospace;font-size:10px;font-weight:700;color:#000;transition:width 1s;}
+.bingo{display:none;background:rgba(255,59,59,.12);border:1px solid var(--red);border-radius:2px;padding:6px 10px;text-align:center;font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:700;color:var(--red);letter-spacing:1px;margin-top:8px;}
+.bingo.on{display:block;}
+.ss{display:flex;justify-content:space-between;align-items:center;padding:7px 12px;border-bottom:1px solid var(--border);}
+.ssl{font-size:12px;color:var(--txt2);font-weight:600;}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.dg{background:var(--green);box-shadow:0 0 5px var(--green);}
+.dy{background:var(--yellow);box-shadow:0 0 5px var(--yellow);}
+.dr{background:var(--red);box-shadow:0 0 5px var(--red);}
+
+/* WEATHER */
+.wxg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 13px;}
+.wxc{background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:9px;text-align:center;}
+.wxi{font-size:20px;margin-bottom:3px;}
+.wxv{font-size:17px;font-family:'Share Tech Mono',monospace;color:var(--txt);}
+.wxl{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+
+/* ORM */
+.ob{height:7px;border-radius:2px;background:var(--bg2);border:1px solid var(--border);overflow:hidden;margin-top:4px;}
+.of{height:100%;border-radius:2px;transition:width .5s;}
+.rb{display:inline-block;padding:3px 9px;border-radius:2px;font-family:'Share Tech Mono',monospace;font-size:10px;font-weight:700;letter-spacing:1px;border:1px solid;}
+.rg{background:rgba(0,255,136,.12);color:var(--green);border-color:rgba(0,255,136,.4);}
+.ry{background:rgba(255,215,0,.1);color:var(--yellow);border-color:rgba(255,215,0,.4);}
+.rr{background:rgba(255,59,59,.1);color:var(--red);border-color:rgba(255,59,59,.4);}
+
+/* SWARM */
+.sv{display:flex;align-items:center;gap:9px;padding:9px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;margin-bottom:6px;}
+.sv-id{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--accent);width:56px;}
+.sv-n{font-size:12px;font-weight:600;}
+.sv-s{font-size:10px;color:var(--muted);font-family:'Share Tech Mono',monospace;}
+.fbtn{padding:7px 10px;border-radius:2px;border:1px solid var(--border);background:var(--bg2);color:var(--txt2);cursor:pointer;font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;transition:all .15s;}
+.fbtn:hover,.fbtn.sel{background:var(--aglow);border-color:var(--accent);color:var(--accent);}
+
+/* REPLAY / SIMULATION */
+.evrow{display:flex;align-items:flex-start;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);}
+.evt{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);width:48px;flex-shrink:0;}
+.evtp{font-size:10px;font-weight:700;width:52px;flex-shrink:0;}
+.evd{font-size:11px;color:var(--txt2);}
+.ei{color:var(--accent);}
+.eo{color:var(--green);}
+.ew{color:var(--yellow);}
+.ed{color:var(--red);}
+
+/* MODAL */
+.mov{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:2000;display:none;align-items:center;justify-content:center;}
+.mov.on{display:flex;}
+.modal{background:var(--bg3);border:1px solid var(--brite);border-radius:4px;padding:22px;min-width:310px;}
+.mt{font-size:12px;color:var(--red);font-family:'Share Tech Mono',monospace;letter-spacing:2px;margin-bottom:12px;text-align:center;}
+.mb{font-size:13px;color:var(--txt2);margin-bottom:16px;line-height:1.6;}
+.mbtns{display:flex;gap:8px;}
+
+/* CANVAS */
+canvas{display:block;max-width:100%;}
+.cbx{background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:12px;}
+.cht{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;}
+
+/* UTILS */
+.div{height:1px;background:var(--border);margin:8px 0;}
+.fr{display:flex;gap:8px;align-items:center;}
+.f1{flex:1;}
+.mt8{margin-top:8px;}
+.mono{font-family:'Share Tech Mono',monospace;}
+*::-webkit-scrollbar{width:3px;}
+*::-webkit-scrollbar-thumb{background:var(--brite);}
+
+/* COMPUTING SPINNER */
+#computing{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(9,21,38,.95);border:1px solid var(--brite);border-radius:3px;padding:16px 22px;z-index:700;display:none;text-align:center;}
+#computing.on{display:block;}
+#computing p{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);margin-top:6px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto;}
+
+/* LIVE USV TELEMETRY HUD (Simulation) */
+#sim-live-hud{
+  display:none;
+  position:absolute;top:10px;right:10px;z-index:600;
+  width:210px;
+  background:rgba(5,13,26,.93);
+  border:1px solid var(--brite);
+  border-radius:3px;
+  font-family:'Share Tech Mono',monospace;
+  overflow:hidden;
+}
+.slh-title{
+  background:rgba(18,184,255,.12);
+  border-bottom:1px solid var(--brite);
+  padding:5px 10px;
+  font-size:9px;color:var(--accent);
+  letter-spacing:2px;text-transform:uppercase;
+  display:flex;align-items:center;gap:6px;
+}
+.slh-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);animation:blink .9s ease-in-out infinite;}
+.slh-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:5px 10px;border-bottom:1px solid rgba(26,51,85,.5);
+  font-size:11px;
+}
+.slh-row:last-of-type{border-bottom:none;}
+.slh-lbl{color:var(--txt2);font-size:10px;letter-spacing:.5px;}
+.slh-val{color:var(--txt);font-weight:700;}
+.slh-val.good{color:var(--green);}
+.slh-val.warn{color:var(--yellow);}
+.slh-val.crit{color:var(--red);}
+.slh-batt{padding:6px 10px;border-top:1px solid rgba(26,51,85,.5);}
+.slh-batt-lbl{font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;display:flex;justify-content:space-between;}
+.slh-batt-outer{height:7px;background:var(--bg);border:1px solid var(--brite);border-radius:2px;overflow:hidden;}
+.slh-batt-inner{height:100%;border-radius:2px;transition:width .6s,background .4s;}
+
+/* EDITABLE WAYPOINT COORDS */
+.wpi-edit{display:none;padding:5px 0 6px;gap:5px;flex-direction:column;}
+.wpi-edit.on{display:flex;}
+.wpi-coords-row{display:flex;gap:4px;align-items:center;}
+.wpi-coords-row input{flex:1;background:var(--bg2);border:1px solid var(--accent);color:var(--accent);padding:4px 6px;border-radius:2px;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;}
+.wpi-edit-btn{font-size:10px;padding:2px 7px;border-radius:2px;cursor:pointer;font-family:'Share Tech Mono',monospace;font-weight:700;border:1px solid;background:transparent;}
+.wpi-apply{color:var(--green);border-color:var(--green);}
+.wpi-apply:hover{background:rgba(0,255,136,.1);}
+.wpi-cancel{color:var(--muted);border-color:var(--muted);}
+.wpi-cancel:hover{background:rgba(255,255,255,.05);}
+.wpi-pencil{margin-left:auto;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 3px;line-height:1;}
+.wpi-pencil:hover{color:var(--accent);}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <span class="logo-t">USV MISSION PLANNER</span>
+  <span class="logo-s">v3.0 — MARITIME MISSION PLANNING</span>
+  <div class="top-mid">
+    <span class="coord">LAT <span id="tb-lat">--</span></span>
+    <span class="coord">LON <span id="tb-lon">--</span></span>
+    <span class="coord" id="tb-wx" style="color:var(--green);">WX ▪ LOADING</span>
+  </div>
+  <div class="top-r">
+    <span class="pill pg" id="p-sys">● ONLINE</span>
+    <span class="pill pb" id="p-geo">◈ GEO LOADING</span>
+    <span class="pill py" id="p-wx">⛵ WX LOADING</span>
+    <span class="pill pr" id="p-comms" style="display:none;">⚡ COMMS LOST</span>
+    <div class="clk" id="clock">00:00:00Z</div>
+  </div>
+</div>
+
+<div id="sidebar">
+  <div class="ns">MISSION</div>
+  <div class="ni active" onclick="showTab('mission',this)">
+    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2L3 7v11h5v-4h4v4h5V7z"/></svg>
+    <span class="ni-l">Mission Planning</span>
+  </div>
+  <div class="ni" onclick="showTab('weather',this)">
+    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M4 12a6 6 0 1112 0H4z"/><rect x="3" y="13" width="14" height="3" rx="1.5"/></svg>
+    <span class="ni-l">Maritime Awareness</span>
+  </div>
+  <div class="ni" onclick="showTab('health',this)">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="2,12 6,12 8,4 12,18 14,10 16,12 20,12"/></svg>
+    <span class="ni-l">Vehicle Health</span>
+    <span class="ni-b nb-g" id="h-badge">OK</span>
+  </div>
+  <div class="ns">SWARM</div>
+  <div class="ni" onclick="showTab('swarm',this)">
+    <svg viewBox="0 0 20 20" fill="currentColor"><circle cx="5" cy="5" r="2"/><circle cx="15" cy="5" r="2"/><circle cx="5" cy="15" r="2"/><circle cx="15" cy="15" r="2"/><circle cx="10" cy="10" r="2"/></svg>
+    <span class="ni-l">Swarm / MUM-T</span>
+    <span class="ni-b">5 USV</span>
+  </div>
+  <div class="ns">ANALYSIS</div>
+  <div class="ni" onclick="showTab('orm',this)">
+    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l2 6h6l-5 3.6 1.9 6L10 14l-4.9 3.6L7 11.6 2 8h6z"/></svg>
+    <span class="ni-l">ORM Risk</span>
+    <span class="ni-b nb-g" id="orm-badge">LOW</span>
+  </div>
+  <div class="ni" onclick="showTab('replay',this)">
+    <svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 7l5 3-5 3V7z"/></svg>
+    <span class="ni-l">Mission Simulation</span>
+  </div>
+</div>
+
+<div class="abar blink" id="comms-bar" style="position:fixed;top:48px;left:214px;right:0;z-index:899;">
+  ⚡ COMMUNICATIONS LINK LOST — USV-01 AUTONOMOUS CONTINGENCY PROTOCOL ACTIVE
+</div>
+
+<div id="main">
+
+  <div class="tab active" id="tab-mission">
+    <div id="mapc">
+      <div class="scan"></div>
+      <div class="cic tl"></div><div class="cic tr"></div>
+      <div class="cic bl"></div><div class="cic br"></div>
+      <div id="map"></div>
+
+      <div id="computing">
+        <div class="spinner"></div>
+        <p id="computing-msg">COMPUTING ROUTE...</p>
+      </div>
+
+      <div class="mtb">
+        <button class="mbtn sel" id="bt-dep" onclick="setTool('dep')">◎ DEPARTURE</button>
+        <button class="mbtn" id="bt-dst" onclick="setTool('dst')">◉ DESTINATION</button>
+        <button class="mbtn" id="bt-wp"  onclick="setTool('wp')">⊕ ADD WAYPOINT</button>
+        <button class="mbtn" onclick="triggerRoute()">⟳ COMPUTE ROUTE</button>
+        <div class="div" style="margin:3px 0;background:var(--brite);"></div>
+        <button class="mbtn" id="bt-wxov" onclick="toggleWxOverlay()">☁ WEATHER OVERLAY</button>
+        <button class="mbtn" onclick="clearAll()">✕ CLEAR ALL</button>
+      </div>
+
+      <div class="mhud">
+        <div class="hr">LAT <span id="h-lat">--</span></div>
+        <div class="hr">LON <span id="h-lon">--</span></div>
+        <div class="hr">DST <span id="h-dist">-- NM</span></div>
+        <div class="hr">ETA <span id="h-eta">--</span></div>
+        <div class="hr">WX  <span id="h-wx" style="color:var(--green)">--</span></div>
+        <div class="hr">ORM <span id="h-orm" style="color:var(--green)">--</span></div>
+      </div>
+
+      <div class="wx-map-legend" id="wx-legend">
+        <div class="wll">WAVE HEIGHT OVERLAY</div>
+        <div class="wli"><div class="wlc" style="background:#3b8bd4;"></div>0–1.0m SAFE</div>
+        <div class="wli"><div class="wlc" style="background:#ffd700;"></div>1.0–2.5m CAUTION</div>
+        <div class="wli"><div class="wlc" style="background:#ff3b3b;"></div>&gt;2.5m DANGER</div>
+        <div class="wli" style="margin-top:6px;border-top:1px solid var(--border);padding-top:5px;">
+          <div style="width:26px;height:2px;background:#fff;"></div><span style="font-size:10px;">Wave-cost route</span>
+        </div>
+        <div class="wli">
+          <div style="width:26px;height:0;border-top:2px dashed #7fa3c8;"></div><span style="font-size:10px;">Shortest path</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="rp">
+      <div class="ph">🗺 MISSION PARAMETERS</div>
+      <div class="psc">
+        <div class="ps">
+          <div class="pl">PLATFORM</div>
+          <select id="platform" onchange="onPlatformChange()">
+            <option>Kongsberg Sounder USV (8m)</option>
+            <option>MANTAS T-38 USV</option>
+            <option>Textron CUSV</option>
+          </select>
+        </div>
+        <div class="ps">
+          <div class="r2">
+            <div><div class="pl">CRUISE SPEED (KTS)</div><input type="number" id="speed-kts" value="8" min="1" max="20"></div>
+          </div>
+        </div>
+        <div class="ps">
+          <div class="pl">LAND CLEARANCE</div>
+          <select id="resolution">
+            <option value="0.5">TIGHT (0.5NM)</option>
+            <option value="1" selected>NORMAL (1NM)</option>
+            <option value="2">SAFE (2NM)</option>
+            <option value="3">WIDE (3NM)</option>
+          </select>
+        </div>
+        <div class="ps">
+          <div class="pl">MISSION NAME</div>
+          <input type="text" id="mname" value="AEGEAN PATROL" style="margin-top:4px;">
+        </div>
+        <div class="ps">
+          <div class="pl">DEPARTURE DATE/TIME</div>
+          <input type="datetime-local" id="dep-dt" style="margin-top:4px;width:100%;box-sizing:border-box;">
+        </div>
+        <div class="ps">
+          <div class="pl">WAYPOINTS</div>
+          <div id="wplist" style="min-height:30px;margin-top:4px;"></div>
+        </div>
+
+        <div class="rleg">
+          <div class="rleg-item"><div class="rleg-line rleg-solid"></div>Wave-cost route</div>
+          <div class="rleg-item"><div class="rleg-line rleg-dash"></div>Shortest path</div>
+        </div>
+
+        <div class="mg">
+          <div class="mc"><div class="mcl">WAVE-COST DIST</div><div class="mcv" id="m-wdist">--<span class="mcu">NM</span></div></div>
+          <div class="mc"><div class="mcl">OPTIMAL DIST</div><div class="mcv" id="m-odist">--<span class="mcu">NM</span></div></div>
+          <div class="mc"><div class="mcl">ETA</div><div class="mcv" id="m-eta">--<span class="mcu">HRS</span></div></div>
+          <div class="mc"><div class="mcl">ENERGY</div><div class="mcv" id="m-nrg">--<span class="mcu">kWh</span></div></div>
+          <div class="mc"><div class="mcl">WAVE PENALTY</div><div class="mcv" id="m-wpen" style="color:var(--yellow);">--%</div></div>
+          <div class="mc"><div class="mcl">ORM RISK</div><div class="mcv" id="m-risk" style="color:var(--green);">--</div></div>
+        </div>
+
+        <div class="ps">
+          <button class="btn bac bw" onclick="saveMission()">💾 SAVE MISSION</button>
+        </div>
+        <div class="ps">
+          <div class="pl">SAVED MISSIONS</div>
+          <div id="saved-list" style="margin-top:5px;"></div>
+          <button class="btn bol bw mt8" style="font-size:11px;" onclick="loadMissions()">↻ REFRESH</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab" id="tab-weather">
+    <div style="display:flex;flex:1;overflow:hidden;">
+      <div style="flex:1;overflow-y:auto;padding:13px;">
+        <div class="pl" style="margin-bottom:11px;">OPEN-METEO MARINE API — AEGEAN SEA (LIVE)</div>
+        <div class="wxg">
+          <div class="wxc"><div class="wxi">🌊</div><div class="wxv" id="wx-wh">--</div><div class="wxl">WAVE Hs</div></div>
+          <div class="wxc"><div class="wxi">🧭</div><div class="wxv" id="wx-wd">--</div><div class="wxl">WAVE DIR</div></div>
+          <div class="wxc"><div class="wxi">⏱</div><div class="wxv" id="wx-wp">--</div><div class="wxl">WAVE Tp</div></div>
+          <div class="wxc"><div class="wxi">💨</div><div class="wxv" id="wx-ws">--</div><div class="wxl">WIND SPD</div></div>
+          <div class="wxc"><div class="wxi">🌬</div><div class="wxv" id="wx-wdir">--</div><div class="wxl">WIND DIR</div></div>
+          <div class="wxc"><div class="wxi">🔵</div><div class="wxv" id="wx-curr">1.2kn</div><div class="wxl">CURRENT</div></div>
+        </div>
+        <div style="display:flex;gap:10px;padding:8px 0;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+          <span style="font-size:10px;color:var(--muted);letter-spacing:1px;">WAVE OVERLAY:</span>
+          <div class="wli"><div class="wlc" style="background:#3b8bd4;width:12px;height:12px;border-radius:50%;"></div>0–1.0m SAFE</div>
+          <div class="wli"><div class="wlc" style="background:#ffd700;width:12px;height:12px;border-radius:50%;"></div>1.0–2.5m CAUTION</div>
+          <div class="wli"><div class="wlc" style="background:#ff3b3b;width:12px;height:12px;border-radius:50%;"></div>&gt;2.5m DANGER</div>
+        </div>
+        <div class="cbx" style="margin-bottom:10px;">
+          <div class="cht">WAVE HEIGHT FORECAST — 24 HRS (OPEN-METEO)</div>
+          <canvas id="waveChart" height="120"></canvas>
+        </div>
+        <div class="cbx">
+          <div class="cht">AIS TRAFFIC — AEGEAN SECTOR</div>
+          <div id="ais-list"></div>
+        </div>
+      </div>
+      <div style="width:245px;background:var(--panel);border-left:1px solid var(--border);padding:12px;overflow-y:auto;">
+        <div class="pl">CPA / COLLISION ALERTS</div>
+        <div id="cpa-list" style="margin-top:7px;"></div>
+        <div class="div"></div>
+        <div class="pl">OPERATIONAL AREAS</div>
+        <div style="margin-top:6px;">
+          <div class="ss" style="border:none;padding:6px 0;"><span class="ssl">FERRY LANES</span><div class="dot dy"></div></div>
+          <div class="ss" style="border:none;padding:6px 0;"><span class="ssl">MIL EX AREA 7</span><div class="dot dr"></div></div>
+          <div class="ss" style="border:none;padding:6px 0;"><span class="ssl">SAR OPS</span><div class="dot dg"></div></div>
+          <div class="ss" style="border:none;padding:6px 0;"><span class="ssl">PORT ACCESS</span><div class="dot dg"></div></div>
+        </div>
+        <div class="div"></div>
+        <div class="pl">LAST WX FETCH</div>
+        <div id="wx-ts" class="mono" style="font-size:10px;color:var(--txt2);margin-top:4px;">--</div>
+        <button class="btn bol bw mt8" style="font-size:11px;" onclick="fetchWX()">↻ REFRESH WEATHER</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab" id="tab-health">
+    <div style="display:flex;flex:1;overflow:hidden;">
+      <div style="flex:1;overflow-y:auto;">
+        <div class="abar blink" id="hc-bar">⚡ LINK DEGRADED — LAST TELEMETRY: STALE</div>
+        <div class="ps">
+          <div class="pl">FUEL / ENERGY — USV-01</div>
+          <div style="display:flex;justify-content:space-between;margin:8px 0 4px;">
+            <span style="font-size:12px;color:var(--txt2);">Remaining Capacity</span>
+            <span class="mono" id="fuel-pct" style="font-size:17px;color:var(--accent);">68%</span>
+          </div>
+          <div class="fuel-outer"><div class="fuel-inner" id="fuel-bar" style="width:68%;background:var(--accent);">68%</div></div>
+          <div class="bingo" id="bingo">⚡ BINGO FUEL — CRITICAL RESERVE ⚡</div>
+          <input type="range" id="fuel-sl" min="0" max="100" value="68" style="width:100%;margin-top:9px;" oninput="setFuel(this.value)">
+          <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:3px;">DRAG TO SIMULATE FUEL CONSUMPTION</div>
+        </div>
+        <div class="hgrid">
+          <div class="gc"><div class="gcl">SPEED (KTS)</div><div class="gcv" id="g-spd">6.8</div><div class="gcb"><div class="gcf" id="gf-spd" style="width:68%;background:var(--accent);"></div></div></div>
+          <div class="gc"><div class="gcl">HEADING (°)</div><div class="gcv" id="g-hdg">127</div><div class="gcb"><div class="gcf" id="gf-hdg" style="width:35%;background:var(--accent);"></div></div></div>
+          <div class="gc"><div class="gcl">RPM</div><div class="gcv" id="g-rpm">2840</div><div class="gcb"><div class="gcf" id="gf-rpm" style="width:71%;background:var(--yellow);"></div></div></div>
+          <div class="gc"><div class="gcl">ROLL (°)</div><div class="gcv" id="g-roll">2.4</div><div class="gcb"><div class="gcf" id="gf-roll" style="width:12%;background:var(--green);"></div></div></div>
+        </div>
+        <div class="ps">
+          <div class="pl">SYSTEMS STATUS</div>
+          <div style="margin-top:6px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;" id="sys-st"></div>
+        </div>
+      </div>
+      <div style="width:245px;background:var(--panel);border-left:1px solid var(--border);padding:12px;overflow-y:auto;">
+        <div class="pl">LIVE TELEMETRY</div>
+        <div class="mono" style="font-size:10px;color:var(--txt2);margin-top:5px;" id="telem-log"></div>
+        <div class="div"></div>
+        <button class="btn bac bw mt8" style="font-size:11px;" onclick="refreshTelem()">↻ POLL TELEMETRY</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab" id="tab-swarm">
+    <div style="display:flex;flex:1;overflow:hidden;">
+      <div style="flex:1;overflow-y:auto;padding:12px;">
+        <div class="pl" style="margin-bottom:9px;">FORMATION SELECT</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:13px;">
+          <button class="fbtn sel" onclick="setForm(this,'LINE AHEAD')">LINE AHEAD</button>
+          <button class="fbtn" onclick="setForm(this,'ECHELON LEFT')">ECHELON LEFT</button>
+          <button class="fbtn" onclick="setForm(this,'ECHELON RIGHT')">ECHELON RIGHT</button>
+          <button class="fbtn" onclick="setForm(this,'ABREAST')">ABREAST</button>
+          <button class="fbtn" onclick="setForm(this,'DIAMOND')">DIAMOND</button>
+          <button class="fbtn" onclick="setForm(this,'LEADER-FOLLOWER')">LEADER-FOLLOWER</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+          <div class="mc"><div class="mcl">FORMATION</div><div style="font-size:14px;font-weight:700;color:var(--accent);margin-top:2px;" id="form-name">LINE AHEAD</div></div>
+          <div class="mc"><div class="mcl">INTERVAL (M)</div><input type="number" value="200" style="margin-top:4px;"></div>
+        </div>
+        <div class="pl" style="margin-bottom:7px;">USV ROSTER</div>
+        <div id="swarm-list"></div>
+        <div class="pl" style="margin:12px 0 7px;">MUM-T — UAV INTEGRATION</div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:11px;">
+          <div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;">
+            <span class="mono" style="font-size:11px;color:var(--accent);">UAV-01</span>
+            <span style="font-size:12px;font-weight:600;">Schiebel S-100 Camcopter</span>
+            <span class="pill pg" style="margin-left:auto;font-size:9px;">● AIRBORNE</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div><div class="pl">ALT</div><div class="mono" style="color:var(--txt);">450 m</div></div>
+            <div><div class="pl">ENDURANCE</div><div class="mono" style="color:var(--txt);">3.2 HRS</div></div>
+            <div><div class="pl">TASK</div><div class="mono" style="color:var(--yellow);">ISR / EO</div></div>
+          </div>
+          <div style="border-top:1px solid var(--border);padding-top:8px;font-size:11px;color:var(--txt2);line-height:1.6;">
+            EO/IR feed: ACTIVE → USV-01, USV-02<br>MAVLink: ENCRYPTED (AES-256)<br>Auto-designate on CPA &lt; 500m
+          </div>
+        </div>
+      </div>
+      <div style="width:245px;background:var(--panel);border-left:1px solid var(--border);padding:12px;overflow-y:auto;">
+        <div class="pl">SWARM FUNCTIONS</div>
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:5px;">
+          <button class="btn bol bw" onclick="swAct('AREA COVERAGE')">◈ AREA COVERAGE</button>
+          <button class="btn bol bw" onclick="swAct('TARGET ENCIRCLEMENT')">◎ TARGET ENCIRCLEMENT</button>
+          <button class="btn bol bw" onclick="swAct('SEARCH PATTERN')">⊕ SEARCH PATTERN</button>
+          <button class="btn bol bw" onclick="swAct('MISSION ASSIGNMENT')">↕ MISSION ASSIGNMENT</button>
+        </div>
+        <div class="div"></div>
+        <div class="pl">MIL-STD-2525</div>
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+          <div class="fr" style="font-size:12px;color:var(--txt2);"><span style="color:var(--accent);font-size:15px;">⊕</span> FRIENDLY FORCES</div>
+          <div class="fr" style="font-size:12px;color:var(--txt2);"><span style="color:var(--red);font-size:15px;">✕</span> ENEMY / UNKNOWN</div>
+          <div class="fr" style="font-size:12px;color:var(--txt2);"><span style="color:var(--yellow);font-size:15px;">⬡</span> AREA OF INTEREST</div>
+        </div>
+        <div class="div"></div>
+        <div class="mono" style="font-size:10px;color:var(--txt2);" id="sw-log"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab" id="tab-orm">
+    <div style="display:flex;flex:1;overflow:hidden;">
+      <div style="flex:1;overflow-y:auto;padding:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;">
+          <span class="pl">ORM ENGINE — REAL WEATHER DATA</span>
+          <span class="rb rg" id="orm-main">RISK: --</span>
+        </div>
+        <div style="font-size:11px;color:var(--txt2);margin-bottom:12px;padding:8px;background:var(--bg2);border:1px solid var(--border);border-radius:3px;">
+          ⟳ ORM auto-calculated from live Open-Meteo data. Click "RECALCULATE" to refresh.
+        </div>
+        <div id="orm-factors"></div>
+        <div class="cbx mt8">
+          <div class="cht">CUMULATIVE RISK SCORE</div>
+          <canvas id="ormChart" height="90"></canvas>
+        </div>
+        <div id="orm-rec" style="margin-top:10px;padding:10px;background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:3px;">
+          <div style="font-size:10px;color:var(--green);letter-spacing:1px;margin-bottom:4px;">⚑ ORM RECOMMENDATION</div>
+          <div style="font-size:12px;color:var(--txt);line-height:1.6;" id="orm-rec-txt">Click RECALCULATE to assess current conditions.</div>
+        </div>
+      </div>
+      <div style="width:245px;background:var(--panel);border-left:1px solid var(--border);padding:12px;overflow-y:auto;">
+        <div class="pl">REAL-TIME INPUTS</div>
+        <div id="orm-inputs" style="margin-top:10px;font-size:12px;color:var(--txt2);line-height:1.8;font-family:'Share Tech Mono',monospace;"></div>
+        <div class="div"></div>
+        <div class="pl">MANUAL OVERRIDES</div>
+        <div style="margin-top:8px;">
+          <div class="pl" style="margin-bottom:3px;">TRAFFIC COUNT</div>
+          <input type="number" id="orm-traffic" value="3" min="0" max="20" style="margin-bottom:8px;">
+          <div class="pl" style="margin-bottom:3px;">FUEL %</div>
+          <input type="number" id="orm-fuel" value="68" min="0" max="100" style="margin-bottom:8px;">
+          <div class="pl" style="margin-bottom:3px;">COMMS TYPE</div>
+          <select id="orm-comms" style="margin-bottom:10px;">
+            <option>SATCOM</option><option>4G_LTE</option><option>UHF</option>
+            <option>DEGRADED</option><option>LOST</option>
+          </select>
+          <button class="btn bac bw" onclick="apiORM()">⟳ RECALCULATE ORM</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab" id="tab-replay">
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="flex:1;display:flex;overflow:hidden;">
+        <div style="flex:1;position:relative;">
+          <div id="replay-map" style="width:100%;height:100%;"></div>
+          <div style="position:absolute;top:10px;left:10px;z-index:500;background:rgba(9,21,38,.9);border:1px solid var(--border);border-radius:2px;padding:8px 12px;">
+            <div class="mono" style="font-size:10px;color:var(--muted);margin-bottom:4px;">REAL-TIME SIMULATION CORE</div>
+            <div class="mono" style="font-size:28px;color:var(--accent);" id="sim-state-text">STANDBY</div>
+            <div id="rep-evt-cur" style="margin-top:6px;font-size:11px;color:var(--txt2);font-family:monospace;">Ready to engage autopilot.</div>
+          </div>
+
+          <!-- LIVE USV TELEMETRY HUD -->
+          <div id="sim-live-hud">
+            <div class="slh-title"><div class="slh-dot"></div>USV-01 LIVE TELEMETRY</div>
+            <div class="slh-row"><span class="slh-lbl">STATE</span><span class="slh-val good" id="slh-state">--</span></div>
+            <div class="slh-row"><span class="slh-lbl">SPD</span><span class="slh-val" id="slh-spd">-- KTS</span></div>
+            <div class="slh-row"><span class="slh-lbl">HDG</span><span class="slh-val" id="slh-hdg">---°</span></div>
+            <div class="slh-row"><span class="slh-lbl">RPM</span><span class="slh-val" id="slh-rpm">----</span></div>
+            <div class="slh-row"><span class="slh-lbl">NEXT WP</span><span class="slh-val" id="slh-wp-dist">-- NM</span></div>
+            <div class="slh-row"><span class="slh-lbl">COVERED</span><span class="slh-val" id="slh-covered">0.0 NM</span></div>
+            <div class="slh-row"><span class="slh-lbl">ETA</span><span class="slh-val" id="slh-eta">--:--</span></div>
+            <div class="slh-batt">
+              <div class="slh-batt-lbl"><span>POWER / ENERGY</span><span id="slh-batt-pct">100%</span></div>
+              <div class="slh-batt-outer"><div class="slh-batt-inner" id="slh-batt-bar" style="width:100%;background:var(--green);"></div></div>
+            </div>
+          </div>
+        </div>
+        <div style="width:290px;background:var(--panel);display:flex;flex-direction:column;">
+          <div class="ph">C2 TACTICAL LOG</div>
+          <div style="flex:1;overflow-y:auto;padding:7px 12px;font-family:monospace;font-size:11px;" id="rep-log"></div>
+        </div>
+      </div>
+      <div style="padding:10px 13px;border-top:1px solid var(--border);background:var(--panel);display:flex;align-items:center;gap:8px;">
+        <button class="btn bac" id="btn-sim-start" onclick="toggleSimulation()"><path d="M8 7l5 3-5 3V7z"/>🚀 ENGAGE AUTOPILOT</button>
+        <button class="btn brd" id="btn-sim-comms" onclick="triggerSimCommsLoss()" style="display:none;">⚠️ SIMULATE COMMS LOSS</button>
+        <button class="btn byw" id="btn-sim-rtb" onclick="triggerSimRTB()" style="display:none;">↩ RTB PROTOCOL</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8765/api';
+
+// ══ CLOCK ══
+function tick(){const n=new Date(),z=v=>String(v).padStart(2,'0');document.getElementById('clock').textContent=`${z(n.getUTCHours())}:${z(n.getUTCMinutes())}:${z(n.getUTCSeconds())}Z`;}
+setInterval(tick,1000);tick();
+
+// ══ TABS ══
+function showTab(id,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  if(el)el.classList.add('active');
+  if(id==='weather'){drawWaveChart();renderAIS();}
+  if(id==='replay')initReplayMap();
+}
+
+// ══ MAP INIT ══
+let map, depM, dstM, wpMs=[], waveRoute=null, optRoute=null;
+let tool='dep', wpts=[], wxOverlayOn=false;
+let wxOverlayLayers=[];
+let activePlannedPath=[]; // Αποθηκεύει τη διαδρομή για το Simulation
+let lastRouteWaveHeight=0; // Αποθηκεύει το wave_height της τελευταίας διαδρομής για fuel calc
+
+const PLATFORM_SPEED = {
+  'Kongsberg Sounder USV (8m)': {min:1, max:10},
+  'MANTAS T-38 USV':            {min:1, max:15},
+  'Textron CUSV':               {min:1, max:20},
+};
+
+function onPlatformChange(){
+  const sel=document.getElementById('platform')?.value||'';
+  const limits=PLATFORM_SPEED[sel]||{min:1,max:20};
+  const spdEl=document.getElementById('speed-kts');
+  if(!spdEl)return;
+  spdEl.min=limits.min; spdEl.max=limits.max;
+  if(parseFloat(spdEl.value)<limits.min) spdEl.value=limits.min;
+  if(parseFloat(spdEl.value)>limits.max) spdEl.value=limits.max;
+}
+
+function initMap(){
+  map = L.map('map',{center:[38.2,24.0],zoom:6,zoomControl:false,attributionControl:false});
+  L.control.zoom({position:'topright'}).addTo(map);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:18,opacity:0.9}).addTo(map);
+
+  map.on('mousemove',e=>{
+    document.getElementById('h-lat').textContent=e.latlng.lat.toFixed(4);
+    document.getElementById('h-lon').textContent=e.latlng.lng.toFixed(4);
+    document.getElementById('tb-lat').textContent=e.latlng.lat.toFixed(4);
+    document.getElementById('tb-lon').textContent=e.latlng.lng.toFixed(4);
+  });
+
+  map.on('click',e=>{
+    const {lat,lng:lon}=e.latlng;
+    if(tool==='dep'){
+      if(depM)depM.remove();
+      depM=L.marker([lat,lon],{icon:mkIcon('◎','#00ff88',24)}).addTo(map).bindPopup('<b style="color:#00ff88">DEPARTURE</b>');
+      wpts=wpts.filter(w=>w.tp!=='dep');
+      wpts.unshift({lat,lon,tp:'dep'});
+      setTool('dst');
+    } else if(tool==='dst'){
+      if(dstM)dstM.remove();
+      dstM=L.marker([lat,lon],{icon:mkIcon('◉','#ff3b3b',24)}).addTo(map).bindPopup('<b style="color:#ff3b3b">DESTINATION</b>');
+      wpts=wpts.filter(w=>w.tp!=='dst');
+      wpts.push({lat,lon,tp:'dst'});
+      setTool('wp');
+    } else if(tool==='wp'){
+      const n=wpMs.length+1;
+      const m=L.marker([lat,lon],{icon:mkIcon('⊕','#12B8FF',20)}).addTo(map).bindPopup(`<b style="color:#12B8FF">WP-${n}</b>`);
+      wpMs.push(m);
+      const di=wpts.findIndex(w=>w.tp==='dst');
+      wpts.splice(di,0,{lat,lon,tp:'wp',num:n});
+    }
+    renderWPList();
+    const hasDep=wpts.some(w=>w.tp==='dep'), hasDst=wpts.some(w=>w.tp==='dst');
+    if(hasDep&&hasDst) triggerRoute();
+  });
+}
+
+function mkIcon(sym,col,sz=22){
+  return L.divIcon({
+    html:`<div style="font-size:${sz}px;color:${col};text-shadow:0 0 8px ${col};line-height:1;">${sym}</div>`,
+    iconSize:[sz+4,sz+4],iconAnchor:[(sz+4)/2,(sz+4)/2],className:'',popupAnchor:[0,-14]
+  });
+}
+
+function setTool(t){
+  tool=t;
+  const m={'dep':'bt-dep','dst':'bt-dst','wp':'bt-wp'};
+  document.querySelectorAll('.mbtn').forEach(b=>b.classList.remove('sel'));
+  if(m[t])document.getElementById(m[t])?.classList.add('sel');
+}
+
+function clearAll(){
+  if(depM){depM.remove();depM=null;}
+  if(dstM){dstM.remove();dstM=null;}
+  wpMs.forEach(m=>m.remove());wpMs=[];
+  if(waveRoute){waveRoute.remove();waveRoute=null;}
+  if(optRoute){optRoute.remove();optRoute=null;}
+  wpts=[]; activePlannedPath=[];
+  renderWPList();
+  ['m-wdist','m-odist','m-eta','m-nrg','m-wpen'].forEach(id=>document.getElementById(id).innerHTML='--');
+  document.getElementById('m-risk').textContent='--';
+  document.getElementById('h-dist').textContent='-- NM';
+  document.getElementById('h-eta').textContent='--';
+  setTool('dep');
+}
+
+function renderWPList(){
+  const el=document.getElementById('wplist');el.innerHTML='';
+  const sorted=[...wpts.filter(w=>w.tp!=='dst'),...wpts.filter(w=>w.tp==='dst')];
+  sorted.forEach((w,i)=>{
+    const cls=w.tp==='dep'?'dep':w.tp==='dst'?'dst':'';
+    const lbl=w.tp==='dep'?'DEP':w.tp==='dst'?'DST':`W${w.num||i}`;
+    const uid=`wp-${w.tp}-${i}`;
+    el.innerHTML+=`
+      <div class="wpi" id="row-${uid}">
+        <div class="wpn ${cls}">${lbl}</div>
+        <div class="wpc">${w.lat.toFixed(4)}, ${w.lon.toFixed(4)}</div>
+        <button class="wpi-pencil" onclick="openWpEdit('${uid}',${i})" title="Edit coordinates">✏</button>
+      </div>
+      <div class="wpi-edit" id="edit-${uid}">
+        <div class="wpi-coords-row">
+          <input id="inp-lat-${uid}" type="number" step="0.0001" value="${w.lat.toFixed(4)}" placeholder="LAT">
+          <input id="inp-lon-${uid}" type="number" step="0.0001" value="${w.lon.toFixed(4)}" placeholder="LON">
+        </div>
+        <div class="wpi-coords-row">
+          <button class="wpi-edit-btn wpi-apply" onclick="applyWpEdit('${uid}',${i})">✔ APPLY</button>
+          <button class="wpi-edit-btn wpi-cancel" onclick="closeWpEdit('${uid}')">✕ CANCEL</button>
+        </div>
+      </div>`;
+  });
+}
+
+function openWpEdit(uid, idx){
+  document.querySelectorAll('.wpi-edit').forEach(e=>e.classList.remove('on'));
+  document.getElementById('edit-'+uid)?.classList.add('on');
+}
+
+function closeWpEdit(uid){
+  document.getElementById('edit-'+uid)?.classList.remove('on');
+}
+
+function applyWpEdit(uid, idx){
+  const newLat = parseFloat(document.getElementById('inp-lat-'+uid)?.value);
+  const newLon = parseFloat(document.getElementById('inp-lon-'+uid)?.value);
+  if(isNaN(newLat)||isNaN(newLon)) return;
+  // Sorted array όπως ακριβώς στο renderWPList
+  const sorted=[...wpts.filter(w=>w.tp!=='dst'),...wpts.filter(w=>w.tp==='dst')];
+  const w = sorted[idx];
+  if(!w) return;
+  // Ενημερώνουμε απευθείας με tp + αναζήτηση στο wpts
+  const target = wpts.find(x => x === w);
+  if(!target) return;
+  target.lat = newLat;
+  target.lon = newLon;
+  // Ενημερώνουμε marker στον χάρτη
+  if(target.tp==='dep' && depM){ depM.setLatLng([newLat,newLon]); }
+  else if(target.tp==='dst' && dstM){ dstM.setLatLng([newLat,newLon]); }
+  else if(target.tp==='wp'){
+    // Βρίσκουμε ποιος αριθμός wp είναι μέσα στο wpts
+    const wpIdx = wpts.filter(x=>x.tp==='wp').indexOf(target);
+    if(wpMs[wpIdx]) wpMs[wpIdx].setLatLng([newLat,newLon]);
+  }
+  closeWpEdit(uid);
+  renderWPList();
+  triggerRoute();
+}
+
+// ══ ROUTE COMPUTATION ══
+let routeTimer=null;
+function triggerRoute(){
+  if(routeTimer)clearTimeout(routeTimer);
+  routeTimer=setTimeout(computeRoute,400);
+}
+
+async function computeRoute(){
+  const ordered=[...wpts.filter(w=>w.tp==='dep'),...wpts.filter(w=>w.tp==='wp'),...wpts.filter(w=>w.tp==='dst')];
+  if(ordered.length<2)return;
+
+  showComputing(true,'A* LAND AVOIDANCE...');
+
+  const cruiseSpd=parseFloat(document.getElementById('speed-kts')?.value||8);
+  const depDt=document.getElementById('dep-dt')?.value||'';
+  const body={
+    name:document.getElementById('mname')?.value||'MISSION',
+    platform:document.getElementById('platform')?.value||'Kongsberg',
+    cruise_speed_kts:cruiseSpd,
+    safety_distance_nm:parseFloat(document.getElementById('resolution')?.value||1),
+    resolution_nm:3,
+    no_go_polygons:[],
+    departure_datetime:depDt?new Date(depDt).toISOString():null,
+    waypoints:ordered.map(w=>({lat:w.lat,lon:w.lon,speed_kts:cruiseSpd,wp_type:w.tp}))
+  };
+
+  try{
+    const r=await fetch(`${API}/route/compute`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json();
+    drawRoutes(d);
+    updateMetrics(d);
+    // ── FUEL SUFFICIENCY CHECK (χρησιμοποιεί το live wave_height από το response) ──
+    const plt = document.getElementById('platform')?.value || 'Kongsberg Sounder USV (8m)';
+    const prof = SIM_USV_PROFILES[plt];
+    if(prof){
+      const dist = d.wave_distance_nm || d.distance_nm || 0;
+      const waveLoad = 1 + (lastRouteWaveHeight * prof.wave_penalty);
+      const effectiveRange = prof.range_nm / waveLoad;
+      const usedPct = (dist / effectiveRange * 100).toFixed(1);
+      if(dist > effectiveRange){
+        logSimEvent('FAIL',`⛽ FUEL CRITICAL: ${prof.range_nm}NM range — mission ${dist.toFixed(0)}NM EXCEEDS RANGE. RTB impossible.`);
+      } else if(dist > effectiveRange * 0.8){
+        logSimEvent('C2',`⚠ FUEL CAUTION: mission uses ${usedPct}% of ${effectiveRange.toFixed(0)}NM effective range. RTB margin critical.`);
+      } else {
+        logSimEvent('DEP',`✅ FUEL OK: mission uses ${usedPct}% of ${effectiveRange.toFixed(0)}NM effective range.`);
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────────────
+  } catch(ex){
+    console.warn('Backend error, local fallback:',ex);
+    localFallback(ordered);
+  } finally {
+    showComputing(false);
+  }
+}
+
+function showComputing(on,msg='COMPUTING...'){
+  const el=document.getElementById('computing');
+  el.classList.toggle('on',on);
+  if(msg)document.getElementById('computing-msg').textContent=msg;
+}
+
+function drawRoutes(d){
+  if(waveRoute){waveRoute.remove();waveRoute=null;}
+  if(optRoute){optRoute.remove();optRoute=null;}
+  activePlannedPath = [];
+
+  if(d.wave_route?.length>1){
+    const ll=d.wave_route.map(p=>[p.lat,p.lon]);
+    activePlannedPath = ll; // Σώζουμε τη διαδρομή για το Simulation!
+    waveRoute=L.polyline(ll,{color:'#ffffff',weight:2.5,opacity:.95}).addTo(map);
+    map.fitBounds(waveRoute.getBounds(),{padding:[55,55]});
+  }
+  if(d.optimal_route?.length>1){
+    const ll=d.optimal_route.map(p=>[p.lat,p.lon]);
+    optRoute=L.polyline(ll,{color:'#7fa3c8',weight:1.8,opacity:.7,dashArray:'10 7'}).addTo(map);
+  }
+}
+
+function localFallback(ordered){
+  if(waveRoute){waveRoute.remove();waveRoute=null;}
+  if(optRoute){optRoute.remove();optRoute=null;}
+  const ll=ordered.map(w=>[w.lat,w.lon]);
+  activePlannedPath = ll;
+  waveRoute=L.polyline(ll,{color:'#ffffff',weight:2.5,opacity:.9}).addTo(map);
+  optRoute=L.polyline(ll,{color:'#7fa3c8',weight:1.8,opacity:.6,dashArray:'10 7'}).addTo(map);
+  map.fitBounds(waveRoute.getBounds(),{padding:[55,55]});
+}
+
+function haversine(lat1,lon1,lat2,lon2){
+  const R=3440.065,dlat=(lat2-lat1)*Math.PI/180,dlon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dlat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dlon/2)**2;
+  return R*2*Math.asin(Math.sqrt(Math.max(0,a)));
+}
+
+function updateMetrics(d){
+  const wd=d.wave_distance_nm||d.distance_nm||0;
+  const od=d.optimal_distance_nm||wd;
+  document.getElementById('m-wdist').innerHTML=(wd.toFixed(1))+'<span class="mcu">NM</span>';
+  document.getElementById('m-odist').innerHTML=(od.toFixed(1))+'<span class="mcu">NM</span>';
+  document.getElementById('m-eta').innerHTML=(d.wave_eta_hrs||d.eta_hrs||0).toFixed(1)+'<span class="mcu">HRS</span>';
+  const nrg=d.wave_energy?.final_energy_wh||d.energy?.final_energy_wh;
+  document.getElementById('m-nrg').innerHTML=(nrg?(nrg/1000).toFixed(1):'--')+'<span class="mcu">kWh</span>';
+  const wp=d.wave_energy?.wave_penalty_pct||d.energy?.wave_penalty_pct||0;
+  document.getElementById('m-wpen').innerHTML=wp.toFixed(1)+'<span class="mcu">%</span>';
+  document.getElementById('m-wpen').style.color=wp>30?'var(--red)':wp>10?'var(--yellow)':'var(--green)';
+  document.getElementById('h-dist').textContent=(wd.toFixed(1))+' NM';
+  document.getElementById('h-eta').textContent=(d.wave_eta_hrs||d.eta_hrs||0).toFixed(1)+' HRS';
+  const risk=d.orm?.risk_level||'--';
+  const rcol={GREEN:'var(--green)',YELLOW:'var(--yellow)',RED:'var(--red)',LOW:'var(--green)',MEDIUM:'var(--yellow)',HIGH:'var(--red)'}[risk]||'var(--txt2)';
+  document.getElementById('m-risk').textContent=risk;
+  document.getElementById('m-risk').style.color=rcol;
+  document.getElementById('h-orm').textContent=risk;
+  document.getElementById('h-orm').style.color=rcol;
+  if(d.orm?.recommendation)document.getElementById('orm-rec-txt').textContent=d.orm.recommendation;
+  updateOrmBadge(risk);
+  if(d.weather){
+    lastRouteWaveHeight = d.weather.wave_height || 0; // αποθηκεύουμε για fuel calc
+    document.getElementById('orm-inputs').innerHTML=
+      `WAVE Hs: ${d.weather.wave_height?.toFixed(2)||'--'}m\n`+
+      `WAVE Tp: ${d.weather.wave_period?.toFixed(1)||'--'}s\n`+
+      `WIND:    ${d.weather.wind_speed?.toFixed(0)||'--'}kn / ${d.weather.wind_direction||'--'}°\n`+
+      `CURRENT: ${d.weather.ocean_current_kn||'--'}kn\n`+
+      `SOURCE:  ${d.weather.source||'--'}`;
+  }
+}
+
+// ══ WEATHER OVERLAY ══
+let wxOverlayActive=false;
+async function toggleWxOverlay(){
+  wxOverlayActive=!wxOverlayActive;
+  const btn=document.getElementById('bt-wxov');
+  btn.classList.toggle('sel',wxOverlayActive);
+  document.getElementById('wx-legend').classList.toggle('on',wxOverlayActive);
+  if(wxOverlayActive){
+    await drawWxOverlay();
+  } else {
+    wxOverlayLayers.forEach(l=>l.remove());
+    wxOverlayLayers=[];
+  }
+}
+
+async function drawWxOverlay(){
+  wxOverlayLayers.forEach(l=>l.remove());
+  wxOverlayLayers=[];
+  showComputing(true,'FETCHING WEATHER GRID...');
+  try{
+    const bounds=map.getBounds();
+    const r=await fetch(`${API}/weather/grid?lat_min=${bounds.getSouth().toFixed(2)}&lat_max=${bounds.getNorth().toFixed(2)}&lon_min=${bounds.getWest().toFixed(2)}&lon_max=${bounds.getEast().toFixed(2)}&cells=6`);
+    const d=await r.json();
+    const cellDeg=1.2;
+    d.grid.forEach(pt=>{
+      const wh=pt.wave_height||1.0;
+      const col=wh<1.0?'#3b8bd4':wh<2.5?'#ffd700':'#ff3b3b';
+      const opacity=0.32+Math.min(0.25,wh/10);
+      const rect=L.rectangle(
+        [[pt.lat-cellDeg/2,pt.lon-cellDeg/2],[pt.lat+cellDeg/2,pt.lon+cellDeg/2]],
+        {color:'transparent',fillColor:col,fillOpacity:opacity,interactive:false}
+      ).addTo(map);
+      const windAngle=pt.wind_direction||0;
+      const arrow=L.divIcon({
+        html:`<div style="transform:rotate(${windAngle}deg);font-size:14px;color:rgba(255,255,255,.6);line-height:1;">↑</div>`,
+        iconSize:[16,16],iconAnchor:[8,8],className:''
+      });
+      const wm=L.marker([pt.lat,pt.lon],{icon:arrow,interactive:false}).addTo(map);
+      wm.bindPopup(`WH: ${wh.toFixed(1)}m | Wind: ${pt.wind_speed?.toFixed(0)}kn @ ${pt.wind_direction}°`);
+      wxOverlayLayers.push(rect,wm);
+    });
+  } catch(e){
+    console.warn('Weather grid fetch failed:',e);
+  } finally {
+    showComputing(false);
+  }
+}
+
+// ══ WEATHER DATA ══
+let wxData={};
+async function fetchWX(){
+  document.getElementById('p-wx').textContent='⛵ LOADING';
+  try{
+    const r=await fetch(`${API}/weather?lat=37.9&lon=23.7`);
+    wxData=await r.json();
+  }catch(e){
+    wxData={wave_height:1.2,wave_direction:215,wave_period:7.4,wind_speed:14,wind_direction:240,ocean_current_kn:1.3,source:'simulated'};
+  }
+  document.getElementById('wx-wh').textContent=(wxData.wave_height?.toFixed(2)||'--')+'m';
+  document.getElementById('wx-wd').textContent=(wxData.wave_direction||'--')+'°';
+  document.getElementById('wx-wp').textContent=(wxData.wave_period?.toFixed(1)||'--')+'s';
+  document.getElementById('wx-ws').textContent=(wxData.wind_speed?.toFixed(0)||'--')+'kn';
+  document.getElementById('wx-wdir').textContent=(wxData.wind_direction||'--')+'°';
+  document.getElementById('wx-ts').textContent=wxData.timestamp?.slice(0,19).replace('T',' ')+'Z';
+  const wh=parseFloat(wxData.wave_height||1.2);
+  const wxTxt=(wh<1?'CALM':wh<2.5?'MODERATE':'ROUGH')+' '+wh.toFixed(2)+'M';
+  document.getElementById('tb-wx').textContent='WX ▪ '+wxTxt;
+  document.getElementById('tb-wx').style.color=wh<1?'var(--green)':wh<2.5?'var(--yellow)':'var(--red)';
+  document.getElementById('h-wx').textContent=wxTxt;
+  document.getElementById('h-wx').style.color=wh<1?'var(--green)':wh<2.5?'var(--yellow)':'var(--red)';
+  const src=wxData.source==='open-meteo-live'?'⛵ WX LIVE':'⚠ WX SIM';
+  document.getElementById('p-wx').textContent=src;
+  document.getElementById('p-wx').className='pill '+(wxData.source==='open-meteo-live'?'pg':'py');
+  renderAIS();
+  drawWaveChart();
+  setTimeout(apiORM,200);
+}
+fetchWX();
+
+function drawWaveChart(){
+  const c=document.getElementById('waveChart');if(!c)return;
+  const ctx=c.getContext('2d'),W=c.offsetWidth||560,H=120;
+  c.width=W;c.height=H;
+  const baseWH=parseFloat(wxData.wave_height||1.2);
+  const forecast=wxData.forecast_24h||[];
+  const data=forecast.length>=12?forecast.slice(0,24):
+    Array.from({length:24},(_,i)=>Math.max(0.2,baseWH+Math.sin(i*.42)*.6+(Math.random()-.5)*.3));
+  const max=4,off=30,usable=W-off;
+  const step=usable/(data.length-1);
+  [0,1,2,2.5,3.5].forEach(v=>{
+    const y=H-18-(v/max*(H-28));
+    ctx.strokeStyle='#1a3355';ctx.lineWidth=.5;
+    ctx.beginPath();ctx.moveTo(off,y);ctx.lineTo(W,y);ctx.stroke();
+    ctx.fillStyle='#3d5a7a';ctx.font='9px Share Tech Mono';ctx.fillText(v+'m',2,y+3);
+  });
+  data.forEach((v,i)=>{
+    if(i===data.length-1)return;
+    const x=off+i*step,nx=off+(i+1)*step;
+    const col=v<1?'rgba(59,139,212,.25)':v<2.5?'rgba(255,215,0,.2)':'rgba(255,59,59,.25)';
+    const y=H-18-(v/max*(H-28));
+    ctx.fillStyle=col;ctx.fillRect(x,y,nx-x+1,H-18-y);
+  });
+  ctx.beginPath();data.forEach((v,i)=>{ctx.lineTo(off+i*step,H-18-(v/max*(H-28)));});
+  ctx.strokeStyle='#12B8FF';ctx.lineWidth=1.5;ctx.stroke();
+  const limY=H-18-(2.5/max*(H-28));
+  ctx.beginPath();ctx.strokeStyle='rgba(255,59,59,.7)';ctx.setLineDash([4,4]);ctx.lineWidth=1;
+  ctx.moveTo(off,limY);ctx.lineTo(W,limY);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='rgba(255,59,59,.7)';ctx.font='9px Share Tech Mono';ctx.fillText('MAX OPR 2.5m',W-78,limY-3);
+}
+
+function renderAIS(){
+  const targets=[
+    {mmsi:'212345678',name:'OLYMPIAS EXPRESS',type:'FERRY',spd:'18.4',hdg:'045',cpa:2.8,tcpa:18},
+    {mmsi:'239876543',name:'AEGEAN PRIDE',type:'CARGO',spd:'11.2',hdg:'180',cpa:6.1,tcpa:45},
+    {mmsi:'240123456',name:'IONIAN SPIRIT',type:'TANKER',spd:'9.7',hdg:'270',cpa:12.3,tcpa:88},
+  ];
+  document.getElementById('ais-list').innerHTML=targets.map(t=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:7px;background:var(--bg3);border:1px solid var(--border);border-radius:2px;margin-bottom:5px;">
+      <div class="mono" style="font-size:10px;color:var(--muted);width:78px;">${t.mmsi}</div>
+      <div style="flex:1;"><div style="font-size:12px;font-weight:600;">${t.name}</div><div class="mono" style="font-size:10px;color:var(--muted);">${t.type} ▪ ${t.spd}KTS ▪ ${t.hdg}°</div></div>
+      <div style="font-size:11px;color:${t.cpa<4?'var(--yellow)':'var(--txt2)'};">CPA ${t.cpa}NM</div>
+    </div>`).join('');
+  document.getElementById('cpa-list').innerHTML=targets.filter(t=>t.cpa<5).map(t=>`
+    <div style="padding:8px;background:rgba(255,215,0,.07);border:1px solid rgba(255,215,0,.3);border-radius:2px;margin-bottom:6px;">
+      <div style="font-size:10px;color:var(--yellow);font-weight:700;margin-bottom:3px;">⚠ CPA ALERT</div>
+      <div style="font-size:11px;color:var(--txt2);">${t.name}<br>CPA: ${t.cpa}NM / TCPA: ${t.tcpa}min</div>
+    </div>`).join('');
+}
+
+// ══ ORM ══
+async function apiORM(){
+  const wh=parseFloat(wxData.wave_height||1.2);
+  const ws=parseFloat(wxData.wind_speed||14);
+  const wp=parseFloat(wxData.wave_period||7.4);
+  const curr=parseFloat(wxData.ocean_current_kn||1.2);
+  const traffic=parseInt(document.getElementById('orm-traffic')?.value||3);
+  const fuel=parseInt(document.getElementById('orm-fuel')?.value||68);
+  const comms=document.getElementById('orm-comms')?.value||'SATCOM';
+  const wdEl=document.getElementById('m-wdist');
+  const dist=parseFloat(wdEl?.textContent)||50;
+
+  document.getElementById('orm-inputs').innerHTML=
+    `WAVE Hs: ${wh.toFixed(2)}m\n`+
+    `WAVE Tp: ${wp.toFixed(1)}s\n`+
+    `WIND:    ${ws.toFixed(0)}kn\n`+
+    `CURRENT: ${curr.toFixed(1)}kn\n`+
+    `TRAFFIC: ${traffic} contacts\n`+
+    `FUEL:    ${fuel}%\n`+
+    `COMMS:   ${comms}\n`+
+    `SOURCE:  ${wxData.source||'--'}`;
+
+  try{
+    const r=await fetch(`${API}/orm/assess`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({wave_height:wh,wind_speed:ws,traffic_count:traffic,
+        distance_nm:dist,fuel_pct:fuel,comms_type:comms,wave_period:wp,ocean_current_kn:curr})});
+    const d=await r.json();
+    renderORMFactors(d);
+  } catch(e){
+    document.getElementById('orm-rec-txt').textContent='Backend offline — cannot calculate ORM.';
+  }
+}
+
+function renderORMFactors(d){
+  if(!d?.factors)return;
+  const factors=d.factors;
+  document.getElementById('orm-factors').innerHTML=Object.entries(factors).map(([k,f])=>{
+    const score=f.score;
+    const r=score<33?'g':score<66?'y':'r';
+    const col=score<33?'var(--green)':score<66?'var(--yellow)':'var(--red)';
+    const label=k.replace(/_/g,' ').toUpperCase();
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:10px;margin-bottom:7px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+        <span style="font-size:10px;color:var(--muted);letter-spacing:1px;">${label}</span>
+        <span class="mono" style="font-size:11px;color:var(--txt2);">${f.value}</span>
+        <span class="rb r${r}">${score}</span>
+      </div>
+      <div class="ob"><div class="of" style="width:${score}%;background:${col};"></div></div>
+    </div>`;
+  }).join('');
+  const risk=d.risk_level;
+  const rcol={GREEN:'var(--green)',YELLOW:'var(--yellow)',RED:'var(--red)'}[risk]||'var(--txt2)';
+  document.getElementById('orm-main').textContent='RISK: '+risk+' ('+d.total_score+')';
+  document.getElementById('orm-main').className='rb '+(risk==='GREEN'?'rg':risk==='YELLOW'?'ry':'rr');
+  document.getElementById('orm-rec-txt').textContent=d.recommendation;
+  const recEl=document.getElementById('orm-rec');
+  recEl.style.background=risk==='GREEN'?'rgba(0,255,136,.06)':risk==='YELLOW'?'rgba(255,215,0,.06)':'rgba(255,59,59,.06)';
+  recEl.style.borderColor=risk==='GREEN'?'rgba(0,255,136,.2)':risk==='YELLOW'?'rgba(255,215,0,.2)':'rgba(255,59,59,.2)';
+  updateOrmBadge(risk);
+  drawOrmChart(d.total_score);
+}
+
+let ormScoreHistory=[];
+function drawOrmChart(newScore){
+  if(newScore!==undefined)ormScoreHistory.push(newScore);
+  if(ormScoreHistory.length>20)ormScoreHistory.shift();
+  const c=document.getElementById('ormChart');if(!c)return;
+  const ctx=c.getContext('2d'),W=c.offsetWidth||400,H=90;
+  c.width=W;c.height=H;
+  const scores=ormScoreHistory.length>1?ormScoreHistory:[22,28,35,18,45,38,25,62,30,20];
+  const step=W/(scores.length-1);
+  ctx.fillStyle='rgba(0,255,136,.05)';ctx.fillRect(0,H-H*0.33,W,H*0.33);
+  ctx.fillStyle='rgba(255,215,0,.05)';ctx.fillRect(0,H-H*0.66,W,H*0.33);
+  ctx.fillStyle='rgba(255,59,59,.05)';ctx.fillRect(0,0,W,H-H*0.66);
+  ctx.beginPath();scores.forEach((v,i)=>{const y=H-10-(v/100*(H-15));i===0?ctx.moveTo(0,y):ctx.lineTo(i*step,y);});
+  ctx.strokeStyle='#12B8FF';ctx.lineWidth=1.5;ctx.stroke();
+  scores.forEach((v,i)=>{
+    const y=H-10-(v/100*(H-15));
+    ctx.beginPath();ctx.arc(i*step,y,3,0,Math.PI*2);
+    ctx.fillStyle=v<33?'var(--green)':v<66?'var(--yellow)':'var(--red)';ctx.fill();
+  });
+}
+
+function updateOrmBadge(risk){
+  const r=risk==='GREEN'?'LOW':risk==='YELLOW'?'MEDIUM':risk==='RED'?'HIGH':risk;
+  const el=document.getElementById('orm-badge');
+  el.textContent=r;
+  el.className='ni-b'+(r==='LOW'||r==='GREEN'?' nb-g':r==='MEDIUM'||r==='YELLOW'?' nb-y':' nb-r');
+}
+
+// ══ VEHICLE HEALTH ══
+const sysList=[
+  {n:'GPS / INS',s:'dg'},{n:'IMU / AHRS',s:'dg'},{n:'NAV RADAR',s:'dg'},
+  {n:'AIS TRANSPONDER',s:'dg'},{n:'SATCOM LINK',s:'dg',id:'dot-sat'},
+  {n:'ISR CAMERA',s:'dg'},{n:'SONAR',s:'dy'},{n:'COLLISION AVOIDANCE',s:'dg'},
+  {n:'MAIN ENGINE',s:'dg'},
+];
+document.getElementById('sys-st').innerHTML=sysList.map((s,i)=>`
+  <div class="ss" ${i===sysList.length-1?'style="border:none;"':''}>
+    <span class="ssl">${s.n}</span>
+    <div class="dot ${s.s}" ${s.id?`id="${s.id}"`:''} ></div>
+  </div>`).join('');
+
+function setFuel(v){
+  v=parseInt(v);
+  const col=v>40?'var(--accent)':v>20?'var(--yellow)':'var(--red)';
+  const bar=document.getElementById('fuel-bar');
+  bar.style.width=v+'%';bar.style.background=col;bar.textContent=v+'%';
+  document.getElementById('fuel-pct').textContent=v+'%';
+  document.getElementById('fuel-pct').style.color=col;
+  document.getElementById('bingo').classList.toggle('on',v<20);
+  const hb=document.getElementById('h-badge');
+  hb.textContent=v<20?'LOW':v<40?'MID':'OK';
+  hb.className='ni-b'+(v<20?' nb-r':v<40?' nb-y':' nb-g');
+}
+
+async function refreshTelem(){
+  let d;
+  try{const r=await fetch(`${API}/telemetry/live`);d=await r.json();}
+  catch(e){d={speed_kts:6.5+Math.random()*.8,heading_deg:124+Math.random()*8,rpm:2780+Math.random()*120,roll_deg:Math.random()*4,timestamp:new Date().toISOString()};}
+  document.getElementById('g-spd').textContent=d.speed_kts?.toFixed(1);
+  document.getElementById('g-hdg').textContent=Math.round(d.heading_deg);
+  document.getElementById('g-rpm').textContent=Math.round(d.rpm);
+  document.getElementById('g-roll').textContent=d.roll_deg?.toFixed(1);
+  document.getElementById('gf-spd').style.width=Math.min(100,d.speed_kts*10)+'%';
+  document.getElementById('gf-hdg').style.width=(d.heading_deg/360*100)+'%';
+  document.getElementById('gf-rpm').style.width=Math.min(100,d.rpm/5000*100)+'%';
+  document.getElementById('gf-roll').style.width=Math.min(100,Math.abs(d.roll_deg)*10)+'%';
+  const log=document.getElementById('telem-log'),t=(d.timestamp||'').slice(11,19);
+  log.innerHTML=`<div style="margin:2px 0;"><span style="color:var(--muted);">${t}</span> <span style="color:var(--accent);">SPD:${d.speed_kts?.toFixed(1)}KTS HDG:${Math.round(d.heading_deg)}° RPM:${Math.round(d.rpm)} ROLL:${d.roll_deg?.toFixed(1)}°</span></div>`+log.innerHTML;
+  if(log.children.length>25)log.removeChild(log.lastChild);
+}
+setInterval(refreshTelem,3000);refreshTelem();
+
+// ══ SWARM ══
+const swarmVehicles=[
+  {id:'USV-01',name:'Kongsberg Sounder',role:'LEAD',spd:'7.2',hdg:'127',fuel:68,st:'dg'},
+  {id:'USV-02',name:'Kongsberg Sounder',role:'WING-L',spd:'7.0',hdg:'127',fuel:72,st:'dg'},
+  {id:'USV-03',name:'MANTAS T-38',role:'WING-R',spd:'7.1',hdg:'129',fuel:61,st:'dy'},
+  {id:'USV-04',name:'Kongsberg Sounder',role:'TRAIL-L',spd:'6.9',hdg:'126',fuel:75,st:'dg'},
+  {id:'USV-05',name:'MANTAS T-38',role:'TRAIL-R',spd:'7.0',hdg:'128',fuel:70,st:'dg'},
+];
+document.getElementById('swarm-list').innerHTML=swarmVehicles.map(v=>`
+  <div class="sv"><div class="sv-id">${v.id}</div>
+  <div><div class="sv-n">${v.name}</div><div class="sv-s">ROLE:${v.role} SPD:${v.spd}KTS FUEL:${v.fuel}%</div></div>
+  <div class="dot ${v.st}" style="margin-left:auto;"></div></div>`).join('');
+
+function setForm(el,name){document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('sel'));el.classList.add('sel');document.getElementById('form-name').textContent=name;swLog('Formation → '+name);}
+function swAct(a){swLog(a+' — initiated');}
+function swLog(m){const t=new Date(),z=v=>String(v).padStart(2,'0'),el=document.getElementById('sw-log');el.innerHTML=`<div style="margin:3px 0;">${z(t.getUTCHours())}:${z(t.getUTCMinutes())} <span style="color:var(--accent);">${m}</span></div>`+el.innerHTML;}
+
+// ══ SAVE / LOAD MISSIONS ══
+async function saveMission(){
+  const ordered=[...wpts.filter(w=>w.tp==='dep'),...wpts.filter(w=>w.tp==='wp'),...wpts.filter(w=>w.tp==='dst')];
+  if(ordered.length<2){alert('Add departure + destination first.');return;}
+  try{
+    const r=await fetch(`${API}/missions`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:document.getElementById('mname').value||'MISSION',
+        platform:document.getElementById('platform').value,cruise_speed_kts:7,safety_distance_nm:2,
+        waypoints:ordered.map(w=>({lat:w.lat,lon:w.lon,speed_kts:7,wp_type:w.tp}))})});
+    const d=await r.json();
+    swLog('Mission saved ID:'+d.mission_id);loadMissions();
+  }catch(e){swLog('Save failed: backend offline');}
+}
+async function loadMissions(){
+  try{
+    const r=await fetch(`${API}/missions`);const data=await r.json();
+    document.getElementById('saved-list').innerHTML=data.slice(0,5).map(m=>`
+      <div style="padding:6px;background:var(--bg2);border:1px solid var(--border);border-radius:2px;margin-bottom:5px;font-size:11px;">
+        <div style="font-weight:700;color:var(--accent);">${m.name}</div>
+        <div class="mono" style="color:var(--muted);">ID:${m.id} ▪ ${m.status}</div>
+      </div>`).join('')||'<div style="color:var(--muted);font-size:11px;">No saved missions.</div>';
+  }catch(e){document.getElementById('saved-list').innerHTML='<div style="color:var(--muted);font-size:11px;">Backend offline.</div>';}
+}
+loadMissions();
+
+// ══ MISSION SIMULATION WITH MAP ══
+let replayMap=null, usvMarker=null, trackLine=null;
+let isSimulating=false, simInterval=null, simPathIndex=0, simCommsLost=false;
+let simWpCounter=1;
+
+// USV energy/physics profiles — αντιστοιχούν ΑΚΡΙΒΩΣ με τα USV_PROFILES του main.py
+const SIM_USV_PROFILES = {
+  'Kongsberg Sounder USV (8m)': { speed: 11.0, base_cost: 17500, wave_penalty: 0.125, rpm_base: 2800, range_nm: 500  },
+  'MANTAS T-38 USV':            { speed: 20.0, base_cost: 62,    wave_penalty: 0.175, rpm_base: 4200, range_nm: 500  },
+  'Textron CUSV':               { speed: 12.0, base_cost: 53000, wave_penalty: 0.065, rpm_base: 3100, range_nm: 3000 },
+};
+
+// State για energy simulation
+let simTotalEnergyBudget = 0;  // συνολικό κόστος διαδρομής (από haversine * base_cost)
+let simEnergySpent = 0;        // ενέργεια που έχει καταναλωθεί ως τώρα
+let simDistanceCovered = 0;    // ΝΜ που έχουν καλυφθεί
+let simTotalDistance = 0;      // συνολική απόσταση διαδρομής σε ΝΜ
+
+function simHaversine(lat1,lon1,lat2,lon2){
+  const R=3440.065,dlat=(lat2-lat1)*Math.PI/180,dlon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dlat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dlon/2)**2;
+  return R*2*Math.asin(Math.sqrt(Math.max(0,a)));
+}
+
+function updateSimHUD(state){
+  const hud = document.getElementById('sim-live-hud');
+  if(!hud) return;
+
+  const platform = document.getElementById('platform')?.value || 'Kongsberg Sounder USV (8m)';
+  const profile  = SIM_USV_PROFILES[platform] || SIM_USV_PROFILES['Kongsberg Sounder USV (8m)'];
+
+  // Heading: από τρέχον σε επόμενο σημείο
+  let hdg = 0, wpDist = 0;
+  if(simPathIndex < activePlannedPath.length - 1){
+    const cur = activePlannedPath[simPathIndex];
+    const nxt = activePlannedPath[simPathIndex + 1];
+    const dlat = nxt[0] - cur[0], dlon = nxt[1] - cur[1];
+    hdg = ((Math.atan2(dlon, dlat) * 180 / Math.PI) + 360) % 360;
+    wpDist = simHaversine(cur[0], cur[1], nxt[0], nxt[1]);
+  }
+
+  // RPM: ανάλογα με πλατφόρμα + μικρό noise
+  const rpm = Math.round(profile.rpm_base * (0.92 + Math.random() * 0.16));
+
+  // ETA: με βάση την απόσταση που απομένει & την ταχύτητα
+  const distRemaining = Math.max(0, simTotalDistance - simDistanceCovered);
+  const etaHrs = profile.speed > 0 ? distRemaining / profile.speed : 0;
+  const etaMins = Math.round(etaHrs * 60);
+  const etaStr = `${String(Math.floor(etaMins/60)).padStart(2,'0')}:${String(etaMins%60).padStart(2,'0')}`;
+
+  // Battery %: NM καλυφθέντα vs πραγματική αυτονομία USV με live wave_height αποστολής
+  // waveLoad: κατανάλωση αυξάνεται γραμμικά με Hs × wave_penalty (από USV specs)
+  const waveLoad = 1 + (lastRouteWaveHeight * profile.wave_penalty);
+  const effectiveRange = profile.range_nm / waveLoad;
+  const battPct = Math.max(0, Math.round(100 - (simDistanceCovered / effectiveRange) * 100));
+
+  const battCol = battPct > 40 ? 'var(--green)' : battPct > 20 ? 'var(--yellow)' : 'var(--red)';
+  const valCls  = battPct > 40 ? 'good' : battPct > 20 ? 'warn' : 'crit';
+
+  document.getElementById('slh-state').textContent    = state || 'EN ROUTE';
+  document.getElementById('slh-state').className      = 'slh-val ' + (state==='RTB (COMMS LOSS)'||state==='RTB ORDERED'?'warn': state==='COMPLETED'?'good':'good');
+  document.getElementById('slh-spd').textContent      = profile.speed.toFixed(1) + ' KTS';
+  document.getElementById('slh-hdg').textContent      = hdg.toFixed(0).padStart(3,'0') + '°';
+  document.getElementById('slh-rpm').textContent      = rpm.toLocaleString();
+  document.getElementById('slh-wp-dist').textContent  = wpDist.toFixed(2) + ' NM';
+  document.getElementById('slh-covered').textContent  = simDistanceCovered.toFixed(1) + ' NM';
+  document.getElementById('slh-eta').textContent      = etaStr;
+  document.getElementById('slh-batt-pct').textContent = battPct + '%';
+  document.getElementById('slh-batt-pct').className   = valCls;
+  document.getElementById('slh-batt-bar').style.width      = battPct + '%';
+  document.getElementById('slh-batt-bar').style.background = battCol;
+}
+
+function initReplayMap(){
+  if(replayMap)return;
+  replayMap=L.map('replay-map',{center:[38.2,24.0],zoom:6,zoomControl:true,attributionControl:false});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,opacity:.9}).addTo(replayMap);
+}
+
+function toggleSimulation() {
+  if(activePlannedPath.length < 2) return alert("Σχεδιάστε πρώτα μια έγκυρη διαδρομή στο Mission Planning!");
+  if(isSimulating) { stopSimulation(); return; }
+
+  isSimulating = true; simCommsLost = false; simWpCounter = 1; simPathIndex = 0;
+  document.getElementById('sim-state-text').textContent = "EN ROUTE";
+  document.getElementById('sim-state-text').style.color = "var(--green)";
+  document.getElementById('btn-sim-start').innerHTML = "⏹ STOP SIMULATION";
+  document.getElementById('btn-sim-comms').style.display = "inline-block";
+  document.getElementById('btn-sim-rtb').style.display = "inline-block";
+  document.getElementById('rep-log').innerHTML = "";
+
+  // Αρχικοποίηση energy simulation
+  const platform = document.getElementById('platform')?.value || 'Kongsberg Sounder USV (8m)';
+  const profile  = SIM_USV_PROFILES[platform] || SIM_USV_PROFILES['Kongsberg Sounder USV (8m)'];
+  simDistanceCovered = 0;
+  simEnergySpent = 0;
+  // Υπολογισμός συνολικής απόστασης & energy budget από το path
+  simTotalDistance = 0;
+  simTotalEnergyBudget = 0;
+  for(let i=0; i<activePlannedPath.length-1; i++){
+    const d = simHaversine(activePlannedPath[i][0], activePlannedPath[i][1], activePlannedPath[i+1][0], activePlannedPath[i+1][1]);
+    simTotalDistance += d;
+    simTotalEnergyBudget += d * profile.base_cost; // energy cost ανά βήμα
+  }
+
+  // Εμφάνιση HUD
+  document.getElementById('sim-live-hud').style.display = 'block';
+
+  initReplayMap();
+  if(usvMarker) usvMarker.remove();
+  if(trackLine) trackLine.remove();
+
+  // Draw full planned track dashed
+  L.polyline(activePlannedPath,{color:'#4a6a8a',weight:1.5,dashArray:'6 5',opacity:.6}).addTo(replayMap);
+
+  const usvIcon=L.divIcon({html:'<div style="font-size:22px;color:#12B8FF;text-shadow:0 0 10px #12B8FF;">⬡</div>',iconSize:[26,26],iconAnchor:[13,13],className:''});
+  usvMarker=L.marker(activePlannedPath[0],{icon:usvIcon}).addTo(replayMap).bindPopup('USV-01');
+  trackLine=L.polyline([activePlannedPath[0]],{color:'#fff',weight:2.5,opacity:.9}).addTo(replayMap);
+  replayMap.panTo(activePlannedPath[0]);
+
+  logSimEvent("DEP", "AUTOPILOT ENGAGED. SATCOM PRIMARY LINK UP.");
+  updateSimHUD('EN ROUTE');
+
+  simInterval = setInterval(() => {
+    if(simPathIndex >= activePlannedPath.length - 1) {
+      logSimEvent("DST", "DESTINATION REACHED. MISSION COMPLETE.");
+      document.getElementById('sim-state-text').textContent = "COMPLETED";
+      updateSimHUD('COMPLETED');
+      stopSimulationUI(); return;
+    }
+
+    // Υπολογισμός βήματος
+    const prev = activePlannedPath[simPathIndex];
+    simPathIndex++;
+    const cur = activePlannedPath[simPathIndex];
+
+    // Απόσταση βήματος & ενέργεια ανά USV
+    const stepDist = simHaversine(prev[0], prev[1], cur[0], cur[1]);
+    simDistanceCovered += stepDist;
+    simEnergySpent += stepDist * profile.base_cost * (1 + profile.wave_penalty * 0.5); // συντηρητικό wave factor
+
+    usvMarker.setLatLng(cur);
+    trackLine.addLatLng(cur);
+    
+    // Pan map to follow USV
+    if(simPathIndex % 2 === 0) replayMap.panTo(cur);
+
+    const state = document.getElementById('sim-state-text').textContent;
+    updateSimHUD(state);
+
+    if(simPathIndex % 15 === 0) {
+      simWpCounter++; logSimEvent("WP", `Passing Waypoint ${simWpCounter} — Telemetry Nominal.`);
+    }
+  }, 250);
+}
+
+function stopSimulation() {
+  stopSimulationUI();
+  logSimEvent("SYS", "Simulation execution aborted by operator.");
+}
+
+function stopSimulationUI() {
+  if(simInterval) clearInterval(simInterval);
+  isSimulating = false;
+  document.getElementById('btn-sim-start').innerHTML = "🚀 ENGAGE AUTOPILOT";
+  document.getElementById('btn-sim-comms').style.display = "none";
+  document.getElementById('btn-sim-rtb').style.display = "none";
+  document.getElementById('sim-live-hud').style.display = "none";
+}
+
+function triggerSimCommsLoss() {
+  if(!isSimulating || simCommsLost) return;
+  simCommsLost = true;
+  document.getElementById('sim-state-text').textContent = "RTB (COMMS LOSS)";
+  document.getElementById('sim-state-text').style.color = "var(--red)";
+
+  let passedSlice = activePlannedPath.slice(0, simPathIndex + 1);
+  activePlannedPath = passedSlice.reverse();
+  simPathIndex = 0;
+  simWpCounter++;
+  logSimEvent("LOSS", "CRITICAL SATCOM LINK LOSS. INITIATING REVERSE FAILSAFE AUTO-RTB.");
+  updateSimHUD('RTB (COMMS LOSS)');
+}
+
+function triggerSimRTB() {
+  if(!isSimulating) return;
+  document.getElementById('sim-state-text').textContent = "RTB ORDERED";
+  document.getElementById('sim-state-text').style.color = "var(--yellow)";
+  let passedSlice = activePlannedPath.slice(0, simPathIndex + 1);
+  activePlannedPath = passedSlice.reverse();
+  simPathIndex = 0;
+  simWpCounter++;
+  logSimEvent("C2", "OPERATOR ISSUED MANUAL RTB ACTION. RETURNING TO DEP.");
+  updateSimHUD('RTB ORDERED');
+}
+
+function logSimEvent(tp, d){
+  const t=new Date(), z=v=>String(v).padStart(2,'0');
+  const ts = `${z(t.getUTCHours())}:${z(t.getUTCMinutes())}:${z(t.getUTCSeconds())}Z`;
+  const el=document.getElementById('rep-log');
+  const colMap={SYS:'ei', DEP:'eo', WP:'ei', DST:'eo', LOSS:'ed', C2:'ew', FAIL:'ed'}[tp]||'ei';
+  el.innerHTML = `<div class="evrow"><div class="evt">${ts}</div><div class="evtp ${colMap}">${tp}</div><div class="evd">${d}</div></div>` + el.innerHTML;
+  document.getElementById('rep-evt-cur').innerHTML = `<span class="${colMap}">${d}</span>`;
+}
+
+// ══ COMMS / RTB (Modals) ══
+function openCommsModal(){document.getElementById('comms-modal').classList.add('on');}
+function closeModal(){document.getElementById('comms-modal').classList.remove('on');}
+function commsAct(a){
+  closeModal();
+  document.getElementById('comms-bar').classList.add('on');
+  document.getElementById('hc-bar').classList.add('on');
+  document.getElementById('p-comms').style.display='flex';
+  const dot=document.getElementById('dot-sat');if(dot)dot.className='dot dr';
+  document.getElementById('comms-bar').textContent=
+    a==='RTB'?'↩ COMMS LOST — USV-01 RTB AUTO-ROUTE ACTIVE':'◎ COMMS LOST — USV-01 LOITER @ LAST WAYPOINT';
+  swLog(`COMMS LOSS → ${a} protocol active`);
+  updateOrmBadge('RED');
+}
+function doRTB(){document.getElementById('comms-bar').classList.add('on');document.getElementById('comms-bar').textContent='↩ RTB ORDERED — AUTO-ROUTE CALCULATING';swLog('RTB protocol activated');}
+
+// ══ GEO STATUS ══
+async function checkGeo(){
+  try{
+    const r=await fetch(`${API}/health`);const d=await r.json();
+    const el=document.getElementById('p-geo');
+    if(d.land_polygons_loaded>0){
+      el.textContent=`◈ GEO ${d.land_polygons_loaded} RINGS`;el.className='pill pg';
+    } else {
+      el.textContent='◈ GEO DOWNLOADING';el.className='pill py';
+      setTimeout(checkGeo,4000);
+    }
+  }catch(e){document.getElementById('p-geo').textContent='◈ GEO OFFLINE';document.getElementById('p-geo').className='pill pr';}
+}
+setTimeout(checkGeo,1500);
+
+// ══ INIT ══
+function initDefaults(){
+  const depEl=document.getElementById('dep-dt');
+  if(depEl){
+    const now=new Date();
+    now.setSeconds(0,0);
+    depEl.value=now.toISOString().slice(0,16);
+  }
+  onPlatformChange();
+}
+setTimeout(()=>{initMap();initDefaults();},150);
+</script>
+</body>
+</html>
