@@ -21,7 +21,7 @@ app = FastAPI(title="USV Mission Planner API v3", version="3.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -46,7 +46,7 @@ except Exception as e:
 # Αντιστοίχιση των νέων UI Platforms στα παλιά Physics Profiles
 USV_PROFILES = {
     "Kongsberg Sounder USV (8m)": {"name": "Kongsberg Sounder", "max_wave": 2.75, "speed": 11.0, "base_cost": 17500, "wave_penalty": 0.125},
-    "MANTAS T-38 USV":            {"name": "MANTAS T-38", "max_wave": 1.75, "speed": 20.0, "base_cost": 62, "wave_penalty": 0.175},
+    "MANTAS T-38 USV":            {"name": "MANTAS T-38", "max_wave": 1.75, "speed": 20.0, "base_cost": 18000, "wave_penalty": 0.175},
     "Textron CUSV":               {"name": "Textron CUSV", "max_wave": 4.5, "speed": 12.0, "base_cost": 53000, "wave_penalty": 0.065}
 }
 
@@ -129,6 +129,8 @@ def get_live_weather_grid():
                     "wind_speed": curr.get("wind_speed_10m", 10.0) * 1.94384, # km/h to knots
                     "wind_direction": curr.get("wind_direction_10m", 180.0)
                 })
+        if not grid_results:  # API επέστρεψε μη-list ή κενό
+            raise ValueError("Empty grid from API")
         return grid_results
     except Exception:
         return [{"lat": c[0], "lon": c[1], "wave_height": 0.5, "wave_direction": 180.0, "wind_speed": 10.0} for c in WEATHER_GRID_COORDS]
@@ -168,11 +170,22 @@ class ORMAssessor:
 def calculate_route(start_node, goal_node, step, usv, standoff_nm, live_grid=None, dyn_obstacles=[], is_weather_aware=False):
     def get_wave_at(lat, lon):
         if not live_grid: return 0.0, 0.0
+        if callable(live_grid):
+            return live_grid(lat, lon)
         closest = min(live_grid, key=lambda w: (w['lat']-lat)**2 + (w['lon']-lon)**2)
         return closest['wave_height'], closest['wave_direction']
 
+    # Αν η αναχώρηση είναι πολύ κοντά σε ξηρά, κάνε snap 0.05° προς τη θάλασσα
     if intersects_land(start_node[0], start_node[1], start_node[0], start_node[1], standoff_nm, dyn_obstacles):
-        return [], 0, 0
+        snapped = None
+        for dlat, dlon in [(0.05,0),(-0.05,0),(0,0.05),(0,-0.05),(0.05,0.05),(-0.05,0.05),(0.05,-0.05),(-0.05,-0.05)]:
+            candidate = (round(start_node[0]+dlat,3), round(start_node[1]+dlon,3))
+            if not intersects_land(candidate[0],candidate[1],candidate[0],candidate[1], standoff_nm, dyn_obstacles):
+                snapped = candidate
+                break
+        if snapped is None:
+            return [], 0, 0
+        start_node = snapped
 
     frontier = []
     heapq.heappush(frontier, (0, start_node))
@@ -189,6 +202,9 @@ def calculate_route(start_node, goal_node, step, usv, standoff_nm, live_grid=Non
         
         if haversine(current[0], current[1], goal_node[0], goal_node[1]) < 3.0:
             if not intersects_land(current[0], current[1], goal_node[0], goal_node[1], standoff_nm, dyn_obstacles):
+                last_hop_dist = haversine(current[0], current[1], goal_node[0], goal_node[1])
+                last_hop_energy = last_hop_dist * usv['base_cost']
+                cost_so_far[goal_node] = cost_so_far[current] + last_hop_energy
                 came_from[goal_node] = current
                 found = True
                 break
@@ -207,7 +223,9 @@ def calculate_route(start_node, goal_node, step, usv, standoff_nm, live_grid=Non
                 if w_h > usv["max_wave"]: continue 
                 
                 heading = (math.degrees(math.atan2(next_node[1] - current[1], next_node[0] - current[0])) + 360) % 360
-                rel_angle = math.radians(abs(w_d - heading))
+                _diff = abs(w_d - heading) % 360
+                _diff = min(_diff, 360 - _diff)
+                rel_angle = math.radians(_diff)
                 frontal_factor = max(0, math.cos(rel_angle))
                 penalty = 1 + ((w_h / 0.5) * usv['wave_penalty'] * frontal_factor)
                 step_energy *= penalty
@@ -324,5 +342,104 @@ def route_compute(req: RouteRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+# ═════════════════════════════════════════════════════════════════════════════
+# 6. DEMO / SCENARIO WEATHER GRID  (για ακαδημαϊκή τεκμηρίωση)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def make_demo_weather_fn(scenario: str):
+    """
+    Επιστρέφει callable(lat, lon) -> (wave_height, wave_direction).
+    O(1) per call — χωρίς min() overhead.
+    """
+    if scenario == "calm":
+        def fn(lat, lon): return 0.3, 180.0
+    elif scenario == "moderate_N":
+        def fn(lat, lon): return 1.8, 0.0
+    elif scenario == "heavy_NE":
+        def fn(lat, lon):
+            # Τετράγωνο κακοκαιρίας: 37.60–38.00°Β / 24.10–24.90°Α
+            if 37.60 <= lat <= 38.00 and 24.10 <= lon <= 24.90:
+                return 2.8, 90.0
+            return 0.2, 90.0
+    else:
+        def fn(lat, lon): return 0.5, 180.0
+    return fn
+
+def demo_orm_weather(scenario: str) -> dict:
+    """Τιμές καιρού για ORM (κέντρο Αιγαίου) ανά σενάριο."""
+    return {
+        "calm":       {"wave_height": 0.3, "wave_direction": 180.0, "wind_speed": 8.0},
+        "moderate_N": {"wave_height": 1.8, "wave_direction":   0.0, "wind_speed": 18.0},
+        "heavy_NE":   {"wave_height": 2.8, "wave_direction":  90.0, "wind_speed": 25.0},
+    }.get(scenario, {"wave_height": 0.5, "wave_direction": 180.0, "wind_speed": 10.0})
+
+@app.post("/api/route/compute/demo")
+def route_compute_demo(req: RouteRequest, scenario: str = "moderate_N"):
+    """
+    Ίδιο με /api/route/compute αλλά χρησιμοποιεί σεναριακό καιρό
+    αντί για live Open-Meteo δεδομένα. Σκοπός: ακαδημαϊκή τεκμηρίωση
+    και επίδειξη weather-aware routing υπό ελεγχόμενες συνθήκες.
+    """
+    try:
+        usv = USV_PROFILES.get(req.platform, USV_PROFILES["Kongsberg Sounder USV (8m)"])
+        weather_fn  = make_demo_weather_fn(scenario)   # callable O(1)
+        orm_weather = demo_orm_weather(scenario)
+
+        full_geo_path, full_wea_path = [], []
+        dist_geo, dist_wea, en_geo, en_wea = 0, 0, 0, 0
+        dyn_obstacles = [Polygon(zone) for zone in req.no_go_polygons if len(zone) >= 3]
+
+        for i in range(len(req.waypoints) - 1):
+            s_node = (req.waypoints[i].lat, req.waypoints[i].lon)
+            g_node = (req.waypoints[i+1].lat, req.waypoints[i+1].lon)
+
+            p_geo, d_geo, e_geo = calculate_route(
+                s_node, g_node, 0.05, usv, req.safety_distance_nm,
+                dyn_obstacles=dyn_obstacles, is_weather_aware=False)
+
+            p_wea, d_wea, e_wea = calculate_route(
+                s_node, g_node, 0.05, usv, req.safety_distance_nm,
+                weather_fn, dyn_obstacles, is_weather_aware=True)
+
+            if not p_wea:
+                raise Exception(f"No valid path found between WP{i} and WP{i+1}")
+
+            full_geo_path.extend(p_geo if i == 0 else p_geo[1:])
+            full_wea_path.extend(p_wea if i == 0 else p_wea[1:])
+            dist_geo += d_geo; dist_wea += d_wea
+            en_geo   += e_geo; en_wea   += e_wea
+
+        orm_res = ORMAssessor.calculate({
+            "wave_height":  orm_weather["wave_height"],
+            "wind_speed":   orm_weather["wind_speed"],
+            "fuel_pct": 100, "comms_type": "SATCOM", "traffic_count": 3
+        })
+
+        return {
+            "optimal_route":       [{"lat": p[0], "lon": p[1]} for p in full_geo_path],
+            "wave_route":          [{"lat": p[0], "lon": p[1]} for p in full_wea_path],
+            "distance_nm":         dist_geo,
+            "optimal_distance_nm": dist_geo,
+            "wave_distance_nm":    dist_wea,
+            "eta_hrs":             dist_geo / usv['speed'],
+            "wave_eta_hrs":        dist_wea / usv['speed'],
+            "energy":      {"final_energy_wh": en_geo, "wave_penalty_pct": 0},
+            "wave_energy": {
+                "final_energy_wh": en_wea,
+                "wave_penalty_pct": ((en_wea - en_geo) / en_geo * 100) if en_geo > 0 else 0
+            },
+            "orm": orm_res,
+            "weather": {
+                "wave_height":    orm_weather["wave_height"],
+                "wave_direction": orm_weather["wave_direction"],
+                "wind_speed":     orm_weather["wind_speed"],
+                "source": f"scenario:{scenario}"
+            },
+            "demo_scenario": scenario
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8765, reload=True)
