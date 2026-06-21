@@ -341,6 +341,7 @@ canvas{display:block;max-width:100%;}
         <button class="mbtn" id="bt-dst" onclick="setTool('dst')">◉ DESTINATION</button>
         <button class="mbtn" id="bt-wp"  onclick="setTool('wp')">⊕ ADD WAYPOINT</button>
         <button class="mbtn" onclick="triggerRoute()">⟳ COMPUTE ROUTE</button>
+        <button class="mbtn" onclick="computeDemo()" style="color:#ff8c00;">⚡ DEMO ΚΑΚΟΚΑΙΡΙΑ</button>
         <div class="div" style="margin:3px 0;background:var(--brite);"></div>
         <button class="mbtn" id="bt-wxov" onclick="toggleWxOverlay()">☁ WEATHER OVERLAY</button>
         <button class="mbtn" onclick="clearAll()">✕ CLEAR ALL</button>
@@ -695,7 +696,7 @@ function onPlatformChange(){
 function initMap(){
   map = L.map('map',{center:[38.2,24.0],zoom:6,zoomControl:false,attributionControl:false});
   L.control.zoom({position:'topright'}).addTo(map);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:18,opacity:0.9}).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,opacity:.9}).addTo(map);
 
   map.on('mousemove',e=>{
     document.getElementById('h-lat').textContent=e.latlng.lat.toFixed(4);
@@ -876,7 +877,33 @@ async function computeRoute(){
     showComputing(false);
   }
 }
-
+async function computeDemo(){
+  showComputing(true,'DEMO: Σεναριακή κακοκαιρία...');
+  const body={
+    name:"DEMO_HEAVY_NE",
+    platform:"Kongsberg Sounder USV (8m)",
+    cruise_speed_kts:11,
+    safety_distance_nm:0.5,
+    resolution_nm:3,
+    no_go_polygons:[],
+    waypoints:[
+      {lat:37.89,lon:23.61,wp_type:"dep",speed_kts:11},
+      {lat:38.37,lon:25.85,wp_type:"dst",speed_kts:11}
+    ]
+  };
+  try{
+    const r=await fetch(`${API}/route/compute/demo?scenario=heavy_NE`,
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify(body)});
+    const d=await r.json();
+    drawRoutes(d);
+    updateMetrics(d);
+  }catch(ex){
+    console.warn('Demo error:',ex);
+  }finally{
+    showComputing(false);
+  }
+}
 function showComputing(on,msg='COMPUTING...'){
   const el=document.getElementById('computing');
   el.classList.toggle('on',on);
@@ -1261,7 +1288,7 @@ let simWpCounter=1;
 // USV energy/physics profiles — αντιστοιχούν ΑΚΡΙΒΩΣ με τα USV_PROFILES του main.py
 const SIM_USV_PROFILES = {
   'Kongsberg Sounder USV (8m)': { speed: 11.0, base_cost: 17500, wave_penalty: 0.125, rpm_base: 2800, range_nm: 500  },
-  'MANTAS T-38 USV':            { speed: 20.0, base_cost: 62,    wave_penalty: 0.175, rpm_base: 4200, range_nm: 500  },
+  'MANTAS T-38 USV':            { speed: 20.0, base_cost: 18000,    wave_penalty: 0.175, rpm_base: 4200, range_nm: 500  },
   'Textron CUSV':               { speed: 12.0, base_cost: 53000, wave_penalty: 0.065, rpm_base: 3100, range_nm: 3000 },
 };
 
