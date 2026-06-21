@@ -11,6 +11,7 @@ import traceback
 from datetime import datetime
 from shapely.geometry import Point, LineString, Polygon, shape
 from shapely.strtree import STRtree
+from shapely.affinity import scale as _affine_scale
 
 # ═════════════════════════════════════════════════════════════════════════════
 # 1. INITIALIZATION & DATA LOADING
@@ -96,18 +97,27 @@ def haversine(lat1, lon1, lat2, lon2):
 
 def intersects_land(lat1, lon1, lat2, lon2, standoff_nm=1.0, dyn_obstacles=[]):
     line = LineString([(lon1, lat1), (lon2, lat2)])
-    standoff_deg = standoff_nm * 0.0166 # 1 NM is roughly 0.0166 degrees
-    
+
+    # NM -> μοίρες πλάτους (σταθερό: 1° lat ≈ 60 NM)
+    standoff_lat_deg = standoff_nm / 60.0
+    # Τοπικό πλάτος αναφοράς (μέσο του τμήματος) για διόρθωση μήκους
+    ref_lat = math.radians((lat1 + lat2) / 2.0)
+    cos_phi = max(math.cos(ref_lat), 1e-6)  # αποφυγή διαίρεσης με 0 κοντά στους πόλους
+
     if spatial_index:
-        search_area = line.buffer(standoff_deg)
+        # Χονδρικό φίλτρο STRtree: over-approximation με τη ΜΕΓΑΛΥΤΕΡΗ απαίτηση (Α-Δ)
+        coarse_deg = standoff_lat_deg / cos_phi
+        search_area = line.buffer(coarse_deg)
+        # Ισομετρικό (equirectangular) πλαίσιο: x'=lon·cosφ, y'=lat -> ισότροπη απόσταση
+        line_iso = _affine_scale(line, xfact=cos_phi, yfact=1.0, origin=(0, 0))
         for idx in spatial_index.query(search_area):
-            poly = land_polygons[idx]
-            if poly.distance(line) < standoff_deg: 
+            poly_iso = _affine_scale(land_polygons[idx], xfact=cos_phi, yfact=1.0, origin=(0, 0))
+            if poly_iso.distance(line_iso) < standoff_lat_deg:
                 return True
-            
+
     if dyn_obstacles:
         for obs in dyn_obstacles:
-            if Point(lon2, lat2).within(obs) or line.intersects(obs): 
+            if Point(lon2, lat2).within(obs) or line.intersects(obs):
                 return True
     return False
 
@@ -136,6 +146,11 @@ def get_live_weather_grid():
         return [{"lat": c[0], "lon": c[1], "wave_height": 0.5, "wave_direction": 180.0, "wind_speed": 10.0} for c in WEATHER_GRID_COORDS]
 
 class ORMAssessor:
+    # Συντελεστής απαισιοδοξίας (Hurwicz optimism-pessimism index).
+    # α=0.7 -> 70% βάρος στο χείριστο σενάριο (max), 30% στον μέσο κίνδυνο (avg).
+    # Συμβατική τιμή στη θεωρία αποφάσεων υπό αβεβαιότητα (Hurwicz, 1951),
+    # εδώ υπέρ του "catastrophe prevention".
+    ALPHA_PESSIMISM = 0.7
     @staticmethod
     def calculate(data: dict):
         wh = data.get('wave_height', 0)
@@ -150,7 +165,8 @@ class ORMAssessor:
 
         max_r = max(w_score, wind_score, f_score, c_score, t_score)
         avg_r = (w_score + wind_score + f_score + c_score + t_score) / 5
-        tot = int((max_r * 0.7) + (avg_r * 0.3))
+        a = ORMAssessor.ALPHA_PESSIMISM
+        tot = int(a * max_r + (1 - a) * avg_r)
 
         if tot < 33: lvl, rec = "GREEN", "GO - Conditions Optimal."
         elif tot < 66: lvl, rec = "YELLOW", "CAUTION - Degraded Conditions."
@@ -204,6 +220,13 @@ def calculate_route(start_node, goal_node, step, usv, standoff_nm, live_grid=Non
             if not intersects_land(current[0], current[1], goal_node[0], goal_node[1], standoff_nm, dyn_obstacles):
                 last_hop_dist = haversine(current[0], current[1], goal_node[0], goal_node[1])
                 last_hop_energy = last_hop_dist * usv['base_cost']
+                # Συνέπεια weather-aware: ίδια ποινή κυματισμού και στο τελικό hop
+                if is_weather_aware and live_grid:
+                    w_h, w_d = get_wave_at(goal_node[0], goal_node[1])
+                    heading = (math.degrees(math.atan2(goal_node[1]-current[1], goal_node[0]-current[0])) + 360) % 360
+                    _diff = min(abs(w_d - heading) % 360, 360 - (abs(w_d - heading) % 360))
+                    frontal = max(0, math.cos(math.radians(_diff)))
+                    last_hop_energy *= 1 + ((w_h / 0.5) * usv['wave_penalty'] * frontal)
                 cost_so_far[goal_node] = cost_so_far[current] + last_hop_energy
                 came_from[goal_node] = current
                 found = True
